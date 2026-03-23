@@ -1,0 +1,13 @@
+[package]
+name = "light-paper"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.102"
+cgmath = "0.18.0"
+image = "0.25.10"
+log = "0.4.29"
+thiserror = "2.0.18"
+vulkanalia = {version="0.35.0", features = ["libloading", "window"]}
+winit = { version = "0.30.13", features = ["wayland"] }
