@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::ptr::copy_nonoverlapping as memcpy;
 
 use crate::context::Vertex;
-use vertex::INDICES;
 use vertex::VERTICES;
 
 use crate::context::vertex;
