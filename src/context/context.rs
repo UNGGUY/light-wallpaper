@@ -1,15 +1,14 @@
 use std::collections::HashSet;
 use std::ptr::copy_nonoverlapping as memcpy;
 
+use crate::context::Vertex;
+use vertex::INDICES;
+use vertex::VERTICES;
+
+use crate::context::vertex;
+use anyhow::{Result, anyhow};
 use image::GenericImageView;
 use image::ImageReader;
-use vulkanalia::vk::EntryV1_0;
-
-use crate::app::vertex;
-
-use super::Vertex;
-use super::vertex::VERTICES;
-use anyhow::{Result, anyhow};
 use vulkanalia::Device;
 use vulkanalia::Entry;
 use vulkanalia::Instance;
@@ -22,6 +21,7 @@ use vulkanalia::vk::AttachmentStoreOp;
 use vulkanalia::vk::CommandBufferBeginInfo;
 use vulkanalia::vk::DescriptorSetLayoutCreateInfo;
 use vulkanalia::vk::DeviceV1_0;
+use vulkanalia::vk::EntryV1_0;
 use vulkanalia::vk::Framebuffer;
 use vulkanalia::vk::Handle;
 use vulkanalia::vk::HasBuilder;

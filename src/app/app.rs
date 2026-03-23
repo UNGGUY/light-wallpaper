@@ -1,11 +1,11 @@
-use crate::app::context;
-
-use super::Context;
 use anyhow::Result;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::WindowAttributes;
 use winit::{application::ApplicationHandler, window::Window};
+
+use crate::context;
+use context::Context;
 
 pub struct App {
     window: Option<Window>,

@@ -3,6 +3,8 @@ use winit::event_loop::{self, EventLoop};
 use crate::app::App;
 
 mod app;
+mod context;
+
 fn main() {
     let event_loop = EventLoop::new().unwrap();
 
