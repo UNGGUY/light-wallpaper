@@ -10,4 +10,5 @@ image = "0.25.10"
 log = "0.4.29"
 thiserror = "2.0.18"
 vulkanalia = {version="0.35.0", features = ["libloading", "window"]}
+wayland-client = "0.31.13"
 winit = { version = "0.30.13", features = ["wayland"] }
