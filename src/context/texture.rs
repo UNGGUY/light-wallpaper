@@ -37,6 +37,10 @@ pub fn create_texture_image(
 
     let (width, height) = image_rgba.dimensions();
 
+    println!("{0}", width);
+
+    println!("{0}", height);
+
     let pixels = image_rgba.as_raw();
 
     let size = pixels.len() as u64;
@@ -314,6 +318,20 @@ pub fn create_texture_sampler(device: &Device, data: &mut ContextData) -> Result
         .address_mode_u(vk::SamplerAddressMode::REPEAT)
         .address_mode_v(vk::SamplerAddressMode::REPEAT)
         .anisotropy_enable(true)
+        .max_anisotropy(16.0)
+        .border_color(vk::BorderColor::INT_OPAQUE_BLACK)
+        .unnormalized_coordinates(false)
+        .compare_enable(false)
+        .compare_op(vk::CompareOp::ALWAYS);
+
+    let info2 = vk::SamplerCreateInfo::builder()
+        .mag_filter(vk::Filter::NEAREST)
+        .min_filter(vk::Filter::NEAREST)
+        .mipmap_mode(vk::SamplerMipmapMode::NEAREST)
+        .address_mode_w(vk::SamplerAddressMode::REPEAT)
+        .address_mode_u(vk::SamplerAddressMode::REPEAT)
+        .address_mode_v(vk::SamplerAddressMode::REPEAT)
+        .anisotropy_enable(false)
         .max_anisotropy(16.0)
         .border_color(vk::BorderColor::INT_OPAQUE_BLACK)
         .unnormalized_coordinates(false)

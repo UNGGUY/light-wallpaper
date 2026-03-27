@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::ffi::c_void;
 use std::ptr::copy_nonoverlapping as memcpy;
 
 use crate::context::Vertex;
@@ -30,6 +31,9 @@ use vulkanalia::vk::ImageView;
 use vulkanalia::vk::InstanceV1_0;
 use vulkanalia::vk::KhrSurfaceExtensionInstanceCommands;
 use vulkanalia::vk::KhrSwapchainExtensionDeviceCommands;
+
+use vulkanalia::vk::KhrWaylandSurfaceExtensionInstanceCommands;
+
 use vulkanalia::vk::PhysicalDevice;
 use vulkanalia::vk::SurfaceKHR;
 use vulkanalia::window as vk_window;
@@ -95,6 +99,89 @@ pub struct ContextData {
 }
 
 impl Context {
+    pub fn create_for_wayland(
+        surface: *mut c_void,
+        display: *mut c_void,
+        width: u32,
+        height: u32,
+    ) -> Result<Self> {
+        let loader = unsafe { LibloadingLoader::new(LIBRARY)? };
+
+        let entry = unsafe { Entry::new(loader).map_err(|b| anyhow!(b))? };
+
+        let instance = create_instance_wayland(&entry)?;
+
+        let image = texture::read_image("assets/wallhaven-3q3wj3.jpg")?;
+
+        let mut data = ContextData::default();
+
+        create_surface(&instance, &mut data, surface, display)?;
+
+        pick_physical_device(&instance, &mut data);
+
+        let device = create_logical_device(&instance, &mut data)?;
+
+        println!("create device success");
+
+        //create swapchain
+        create_swapchain_wayland(width, height, &instance, &device, &mut data)?;
+
+        create_swapchain_image_view(&device, &mut data)?;
+
+        println!("create swapchain success");
+
+        // create render pass
+        create_render_pass(&device, &mut data)?;
+
+        println!("create render pass success");
+
+        //create descriptor set
+        create_descriptor_set_layout(&device, &mut data)?;
+
+        // create pipeline
+        create_pipeline(&device, &mut data)?;
+
+        println!("create pipeline success");
+        // create frame
+        create_frame_buffers(&device, &mut data)?;
+
+        println!("create frame success");
+
+        //create command
+        create_command_pool(&instance, &device, &mut data)?;
+
+        //create image
+        texture::create_texture_image(&instance, &device, &mut data, &image)?;
+        println!("create image success");
+        texture::create_texture_image_view(&device, &mut data)?;
+        println!("create image success");
+        texture::create_texture_sampler(&device, &mut data)?;
+        println!("create image success");
+
+        // create vertex
+        create_vertex_buffer(&instance, &device, &mut data)?;
+
+        println!("create vertex success");
+        // create index
+        create_index_buffer(&instance, &device, &mut data)?;
+
+        // create descriptor
+        create_descroptor_pool(&device, &mut data)?;
+        create_descriptor_sets(&device, &mut data)?;
+
+        create_command_buffers(&device, &mut data)?;
+
+        // create sync
+        create_sync_objects(&device, &mut data)?;
+        Ok(Self {
+            instance,
+            data,
+            device,
+            frame: 0,
+            image,
+        })
+    }
+
     pub fn create(window: &Window) -> Result<Self> {
         let loader = unsafe { LibloadingLoader::new(LIBRARY)? };
 
@@ -171,6 +258,73 @@ impl Context {
             frame: 0,
             image,
         })
+    }
+
+    pub fn render_wayland(&mut self) -> Result<()> {
+        println!("{0}", self.frame);
+        let in_flight_fence = self.data.in_flight_fences[self.frame];
+        unsafe {
+            self.device
+                .wait_for_fences(&[in_flight_fence], true, u64::MAX)?;
+        };
+
+        let image_index = unsafe {
+            self.device
+                .acquire_next_image_khr(
+                    self.data.swapchain,
+                    u64::MAX,
+                    self.data.image_available_semaphore[self.frame],
+                    vk::Fence::null(),
+                )?
+                .0 as usize
+        };
+
+        let image_fence = self.data.image_in_flight[image_index];
+
+        if !image_fence.is_null() {
+            unsafe {
+                self.device
+                    .wait_for_fences(&[image_fence], true, u64::MAX)?;
+            }
+        };
+
+        self.data.image_in_flight[image_index] = in_flight_fence;
+
+        println!("{0}", image_index);
+
+        let wait_semaphores = &[self.data.image_available_semaphore[self.frame]];
+        let wait_stages = &[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+        let command_buffers = &[self.data.command_buffers[image_index as usize]];
+        let signal_semaphores = &[self.data.render_finished_semaphore[image_index as usize]];
+
+        let submit_info = vk::SubmitInfo::builder()
+            .wait_semaphores(wait_semaphores)
+            .wait_dst_stage_mask(wait_stages)
+            .command_buffers(command_buffers)
+            .signal_semaphores(signal_semaphores);
+
+        unsafe { self.device.reset_fences(&[in_flight_fence])? };
+
+        unsafe {
+            self.device
+                .queue_submit(self.data.graphics_queue, &[submit_info], in_flight_fence)?
+        };
+
+        let swapchains = &[self.data.swapchain];
+        let image_indices = &[image_index as u32];
+        let present_info = vk::PresentInfoKHR::builder()
+            .wait_semaphores(signal_semaphores)
+            .swapchains(swapchains)
+            .image_indices(image_indices);
+
+        unsafe {
+            self.device
+                .queue_present_khr(self.data.present_queue, &present_info)?
+        };
+
+        self.frame = (self.frame + 1) % self.data.swapchain_image.len();
+
+        Ok(())
     }
 
     #[allow(unused_variables)]
@@ -302,6 +456,25 @@ impl Context {
         }
     }
 }
+
+///
+/// Create Surface
+///
+fn create_surface(
+    instance: &Instance,
+    data: &mut ContextData,
+    surface: *mut c_void,
+    display: *mut c_void,
+) -> Result<()> {
+    let info = vk::WaylandSurfaceCreateInfoKHR::builder()
+        .surface(surface)
+        .display(display);
+
+    data.surface = unsafe { instance.create_wayland_surface_khr(&info, None)? };
+
+    Ok(())
+}
+
 //
 //Create Instance
 //
@@ -332,6 +505,44 @@ fn create_instance(window: &Window, entry: &Entry) -> Result<Instance> {
         .iter()
         .map(|p| p.as_ptr())
         .collect::<Vec<_>>();
+
+    let instance_info = vk::InstanceCreateInfo::builder()
+        .application_info(&app_info)
+        .enabled_layer_names(&layers)
+        .enabled_extension_names(&extension);
+
+    Ok(unsafe { entry.create_instance(&instance_info, None)? })
+}
+fn create_instance_wayland(entry: &Entry) -> Result<Instance> {
+    let app_info = vk::ApplicationInfo::builder()
+        .application_name(b"light paper")
+        .application_version(vk::make_version(1, 0, 0))
+        .engine_name(b"No Engine")
+        .engine_version(vk::make_version(1, 0, 0))
+        .api_version(vk::make_version(1, 0, 0));
+
+    let available_layers = unsafe { entry.enumerate_instance_layer_properties()? }
+        .iter()
+        .map(|l| l.layer_name)
+        .collect::<HashSet<_>>();
+
+    if VALIDATION_ENABLED && !available_layers.contains(&VALIDATION_LAYER) {
+        return Err(anyhow!("Validation layer requested but not supported."));
+    }
+
+    let layers = if VALIDATION_ENABLED {
+        vec![VALIDATION_LAYER.as_ptr()]
+    } else {
+        Vec::new()
+    };
+
+    let extension = &[
+        &vk::KHR_SURFACE_EXTENSION.name,
+        &vk::KHR_WAYLAND_SURFACE_EXTENSION.name,
+    ]
+    .iter()
+    .map(|p| p.as_ptr())
+    .collect::<Vec<_>>();
 
     let instance_info = vk::InstanceCreateInfo::builder()
         .application_info(&app_info)
@@ -550,6 +761,93 @@ fn get_swapchain_extent(window: &Window, capabilities: vk::SurfaceCapabilitiesKH
         .build()
 }
 
+/// Create SwapChain
+fn create_swapchain_wayland(
+    width: u32,
+    height: u32,
+    instance: &Instance,
+    device: &Device,
+    data: &mut ContextData,
+) -> Result<()> {
+    let indices = QueueFamilyindices::get(instance, data.physical_device, data.surface)?;
+    let support = SwapChainSupport::get(instance, data.physical_device, data.surface)?;
+
+    // surface format
+    let surface_format = get_swapchain_surface_format(&support.formats);
+    // present mode
+    let present_mode = get_swapchain_present_mode(&support.present_modes);
+    // extent 1920*1080
+    let extent2d = get_swapchain_extent_wayland(width, height, support.capabilities);
+
+    // image count
+    let mut image_count = support.capabilities.min_image_count + 1;
+    if support.capabilities.max_image_count != 0
+        && image_count > support.capabilities.max_image_count
+    {
+        image_count = support.capabilities.max_image_count;
+    }
+
+    let mut queue_family_indices = vec![];
+
+    let image_sharing_mode = if indices.graphics != indices.present {
+        queue_family_indices.push(indices.graphics);
+        queue_family_indices.push(indices.present);
+        vk::SharingMode::CONCURRENT
+    } else {
+        vk::SharingMode::EXCLUSIVE
+    };
+
+    let swapchain_info = vk::SwapchainCreateInfoKHR::builder()
+        // set surface
+        .surface(data.surface)
+        // image setting
+        .min_image_count(image_count)
+        .image_format(surface_format.format)
+        .image_color_space(surface_format.color_space)
+        .image_extent(extent2d)
+        .image_array_layers(1)
+        .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
+        // image sharing settings
+        .image_sharing_mode(image_sharing_mode)
+        .queue_family_indices(&queue_family_indices)
+        // transforms setting
+        .pre_transform(support.capabilities.current_transform)
+        // composite_alpha
+        .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
+        // present_mode setting
+        .present_mode(present_mode)
+        .clipped(true)
+        //old swapchain
+        .old_swapchain(vk::SwapchainKHR::null());
+
+    data.swapchain = unsafe { device.create_swapchain_khr(&swapchain_info, None)? };
+    data.swapchain_image = unsafe { device.get_swapchain_images_khr(data.swapchain)? };
+    data.swapchain_format = surface_format.format;
+    data.swapchain_extent = extent2d;
+
+    Ok(())
+}
+
+fn get_swapchain_extent_wayland(
+    width: u32,
+    height: u32,
+    capabilities: vk::SurfaceCapabilitiesKHR,
+) -> vk::Extent2D {
+    if capabilities.current_extent.width != u32::MAX {
+        return capabilities.current_extent;
+    }
+    vk::Extent2D::builder()
+        .width(width.clamp(
+            capabilities.min_image_extent.width,
+            capabilities.max_image_extent.width,
+        ))
+        .height(height.clamp(
+            capabilities.min_image_extent.height,
+            capabilities.max_image_extent.height,
+        ))
+        .build()
+}
+
 ///
 /// Create Image View
 ///
@@ -650,9 +948,8 @@ fn create_pipeline(device: &Device, data: &mut ContextData) -> Result<()> {
         .depth_bias_enable(false)
         .line_width(1.0);
 
-    let multisample_state = vk::PipelineMultisampleStateCreateInfo::builder()
-        .sample_shading_enable(false)
-        .rasterization_samples(vk::SampleCountFlags::_1);
+    let multisample_state =
+        vk::PipelineMultisampleStateCreateInfo::builder().sample_shading_enable(false);
 
     let attachment = vk::PipelineColorBlendAttachmentState::builder()
         .color_write_mask(vk::ColorComponentFlags::all())

@@ -1,3 +1,1 @@
-pub mod wayland;
-
-pub use wayland::WayApp;
+pub mod wlr_layer_shell;

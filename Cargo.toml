@@ -5,10 +5,17 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.102"
+bitflags = "2.11.0"
 cgmath = "0.18.0"
 image = "0.25.10"
 log = "0.4.29"
+tempfile = "3.27.0"
 thiserror = "2.0.18"
 vulkanalia = {version="0.35.0", features = ["libloading", "window"]}
+wayland-backend = "0.3.14"
 wayland-client = "0.31.13"
+wayland-protocols = "0.32.11"
+wayland-scanner = "0.31.9"
 winit = { version = "0.30.13", features = ["wayland"] }
+
+
