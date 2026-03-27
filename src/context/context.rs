@@ -9,6 +9,7 @@ use vertex::VERTICES;
 
 use crate::context::tool;
 
+use crate::context::msaa;
 use crate::context::texture;
 
 use anyhow::{Result, anyhow};
@@ -64,8 +65,8 @@ pub struct ContextData {
     surface: vk::SurfaceKHR,
     swapchain: vk::SwapchainKHR,
     swapchain_image: Vec<vk::Image>,
-    swapchain_format: vk::Format,
-    swapchain_extent: vk::Extent2D,
+    pub(crate) swapchain_format: vk::Format,
+    pub(crate) swapchain_extent: vk::Extent2D,
     swapchain_image_view: Vec<vk::ImageView>,
     render_pass: vk::RenderPass,
     pipeline_layout: vk::PipelineLayout,
@@ -90,6 +91,12 @@ pub struct ContextData {
     pub(crate) texture_image_memory: vk::DeviceMemory,
     pub(crate) texture_image_view: vk::ImageView,
     pub(crate) texture_image_sampler: vk::Sampler,
+
+    // Msaa
+    pub(crate) color_image: vk::Image,
+    pub(crate) color_image_memory: vk::DeviceMemory,
+    pub(crate) color_image_view: vk::ImageView,
+    pub(crate) msaa_samples: vk::SampleCountFlags,
 
     image_available_semaphore: Vec<vk::Semaphore>,
     render_finished_semaphore: Vec<vk::Semaphore>,
@@ -121,6 +128,10 @@ impl Context {
 
         let device = create_logical_device(&instance, &mut data)?;
 
+        data.msaa_samples = msaa::get_max_msaa_samples(&instance, &data);
+
+        println!("msaa : {:?}", data.msaa_samples);
+
         println!("create device success");
 
         //create swapchain
@@ -141,14 +152,16 @@ impl Context {
         // create pipeline
         create_pipeline(&device, &mut data)?;
 
+        //create command
+        create_command_pool(&instance, &device, &mut data)?;
+
+        msaa::create_color_objects(&instance, &device, &mut data)?;
+
         println!("create pipeline success");
         // create frame
         create_frame_buffers(&device, &mut data)?;
 
         println!("create frame success");
-
-        //create command
-        create_command_pool(&instance, &device, &mut data)?;
 
         //create image
         texture::create_texture_image(&instance, &device, &mut data, &image)?;
@@ -635,7 +648,9 @@ fn create_logical_device(instance: &Instance, data: &mut ContextData) -> Result<
     let layer = vec![];
 
     // Feature
-    let feature = vk::PhysicalDeviceFeatures::builder().sampler_anisotropy(true);
+    let feature = vk::PhysicalDeviceFeatures::builder()
+        .sampler_anisotropy(true)
+        .sample_rate_shading(true);
 
     //Extension
 
@@ -948,8 +963,10 @@ fn create_pipeline(device: &Device, data: &mut ContextData) -> Result<()> {
         .depth_bias_enable(false)
         .line_width(1.0);
 
-    let multisample_state =
-        vk::PipelineMultisampleStateCreateInfo::builder().sample_shading_enable(false);
+    let multisample_state = vk::PipelineMultisampleStateCreateInfo::builder()
+        .rasterization_samples(data.msaa_samples)
+        .sample_shading_enable(true)
+        .min_sample_shading(0.2);
 
     let attachment = vk::PipelineColorBlendAttachmentState::builder()
         .color_write_mask(vk::ColorComponentFlags::all())
@@ -1000,7 +1017,7 @@ fn create_frame_buffers(device: &Device, data: &mut ContextData) -> Result<()> {
         .swapchain_image_view
         .iter()
         .map(|i| {
-            let attachments = &[*i];
+            let attachments = &[data.color_image_view, *i];
             let info = vk::FramebufferCreateInfo::builder()
                 .render_pass(data.render_pass)
                 .attachments(attachments)
@@ -1034,11 +1051,21 @@ fn create_shader_module(device: &Device, bytecode: &[u8]) -> Result<vk::ShaderMo
 fn create_render_pass(device: &Device, data: &mut ContextData) -> Result<()> {
     let attachment = vk::AttachmentDescription::builder()
         .format(data.swapchain_format)
-        .samples(vk::SampleCountFlags::_1)
+        .samples(data.msaa_samples)
         .load_op(vk::AttachmentLoadOp::CLEAR)
         .store_op(vk::AttachmentStoreOp::STORE)
         .stencil_load_op(AttachmentLoadOp::DONT_CARE)
         .stencil_store_op(AttachmentStoreOp::DONT_CARE)
+        .initial_layout(vk::ImageLayout::UNDEFINED)
+        .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+
+    let color_resolve_attachment = vk::AttachmentDescription::builder()
+        .format(data.swapchain_format)
+        .samples(vk::SampleCountFlags::_1)
+        .load_op(vk::AttachmentLoadOp::DONT_CARE)
+        .store_op(vk::AttachmentStoreOp::STORE)
+        .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+        .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
         .initial_layout(vk::ImageLayout::UNDEFINED)
         .final_layout(vk::ImageLayout::PRESENT_SRC_KHR);
 
@@ -1046,13 +1073,19 @@ fn create_render_pass(device: &Device, data: &mut ContextData) -> Result<()> {
         .attachment(0)
         .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
 
+    let color_resolve_attachment_ref = vk::AttachmentReference::builder()
+        .attachment(1)
+        .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+
     let attachmnets = &[color_attachment_ref];
+    let resolve_attachments = &[color_resolve_attachment_ref];
 
     let subpass = vk::SubpassDescription::builder()
         .color_attachments(attachmnets)
-        .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS);
+        .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+        .resolve_attachments(resolve_attachments);
 
-    let attachments = &[attachment];
+    let attachments = &[attachment, color_resolve_attachment];
 
     let subpasses = &[subpass];
 

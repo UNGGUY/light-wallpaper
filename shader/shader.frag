@@ -9,28 +9,45 @@ layout(binding = 1) uniform sampler2D texSampler;
 // 输出颜色到帧缓冲区的 Color Attachment 0
 layout(location = 0) out vec4 outColor;
 
-void main() {
 
+
+
+float cubic(float x) {
+    x = abs(x);
+    if (x < 1.0) return (1.5 * x - 2.5) * x * x + 1.0;
+    else if (x < 2.0) return ((-0.5 * x + 2.5) * x - 4.0) * x + 2.0;
+    return 0.0;
+}
+
+vec4 textureBicubic(sampler2D tex, vec2 uv, vec2 texSize) {
+    uv = uv * texSize - 0.5;
+    vec2 iuv = floor(uv);
+    vec2 fuv = uv - iuv;
+
+    vec4 result = vec4(0.0);
+    for (int m = -1; m <= 2; m++) {
+        for (int n = -1; n <= 2; n++) {
+            vec2 offset = vec2(float(m), float(n));
+            vec2 coord = (iuv + offset + 0.5) / texSize;
+            float wx = cubic(float(m) - fuv.x);
+            float wy = cubic(float(n) - fuv.y);
+            result += texture(tex, coord) * wx * wy;
+        }
+    }
+    return result;
+}
+
+void main() {
     vec2 screenSize = vec2(1493.0, 933.0);
     vec2 imageSize  = vec2(4096.0, 2304.0);
 
-    float screenAspect = screenSize.x / screenSize.y;
-    float imageAspect  = imageSize.x / imageSize.y;
+    // 保持比例缩放：取最小缩放因子
+    float scale = min(screenSize.x / imageSize.x, screenSize.y / imageSize.y);
 
-    vec2 uv = fragTexCoord;
+    // 把屏幕坐标映射到图像坐标
+    vec2 scaledUV = fragTexCoord * screenSize / (imageSize * scale);
 
-    if (imageAspect > screenAspect) {
-        // 图像更宽，按宽度缩放
-        uv.y = uv.y * (screenAspect / imageAspect);
-    } else {
-        // 图像更高，按高度缩放
-        uv.x = uv.x * (imageAspect / screenAspect);
-    }
-
-    // 采样纹理
-    vec4 texColor = texture(texSampler,uv);
-    
-    // 输出最终颜色
-    outColor = texColor;
+    // Bicubic 插值采样
+    outColor = textureBicubic(texSampler, scaledUV, imageSize);
 }
 

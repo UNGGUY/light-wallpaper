@@ -64,7 +64,7 @@ pub fn create_texture_image(
         device.unmap_memory(staging_buffer_memory);
     };
 
-    let (texture_image, texture_image_momery) = create_image(
+    let (texture_image, texture_image_momery) = tool::create_image(
         instance,
         device,
         data,
@@ -72,6 +72,7 @@ pub fn create_texture_image(
         height,
         vk::Format::R8G8B8A8_SRGB,
         vk::ImageTiling::OPTIMAL,
+        vk::SampleCountFlags::_1,
         vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
     )?;
@@ -110,53 +111,6 @@ pub fn create_texture_image(
     }
 
     Ok(())
-}
-
-fn create_image(
-    instance: &Instance,
-    device: &Device,
-    data: &mut ContextData,
-    width: u32,
-    height: u32,
-    format: vk::Format,
-    tiling: vk::ImageTiling,
-    usage: vk::ImageUsageFlags,
-    properties: vk::MemoryPropertyFlags,
-) -> Result<(vk::Image, vk::DeviceMemory)> {
-    let image_info = vk::ImageCreateInfo::builder()
-        .image_type(vk::ImageType::_2D)
-        .extent(vk::Extent3D {
-            width,
-            height,
-            depth: 1,
-        })
-        .mip_levels(1)
-        .array_layers(1)
-        .format(format)
-        .tiling(tiling)
-        .initial_layout(vk::ImageLayout::UNDEFINED)
-        .usage(usage)
-        .sharing_mode(vk::SharingMode::EXCLUSIVE)
-        .samples(vk::SampleCountFlags::_1)
-        .flags(vk::ImageCreateFlags::empty());
-    let texture_image = unsafe { device.create_image(&image_info, None)? };
-
-    let requirements = unsafe { device.get_image_memory_requirements(texture_image) };
-
-    let memory_info = vk::MemoryAllocateInfo::builder()
-        .allocation_size(requirements.size)
-        .memory_type_index(tool::get_memory_type_index(
-            instance,
-            data,
-            properties,
-            requirements,
-        )?);
-
-    let texture_image_memory = unsafe { device.allocate_memory(&memory_info, None)? };
-
-    unsafe { device.bind_image_memory(texture_image, texture_image_memory, 0)? };
-
-    Ok((texture_image, texture_image_memory))
 }
 
 fn begin_single_time_command(device: &Device, data: &ContextData) -> Result<vk::CommandBuffer> {
@@ -302,7 +256,7 @@ fn copy_buffer_to_image(
 ///
 pub fn create_texture_image_view(device: &Device, data: &mut ContextData) -> Result<()> {
     data.texture_image_view =
-        create_image_view(device, data.texture_image, vk::Format::R8G8B8A8_SRGB)?;
+        tool::create_image_view(device, data.texture_image, vk::Format::R8G8B8A8_SRGB)?;
     Ok(())
 }
 
@@ -338,29 +292,6 @@ pub fn create_texture_sampler(device: &Device, data: &mut ContextData) -> Result
         .compare_enable(false)
         .compare_op(vk::CompareOp::ALWAYS);
 
-    data.texture_image_sampler = unsafe { device.create_sampler(&info, None)? };
+    data.texture_image_sampler = unsafe { device.create_sampler(&info2, None)? };
     Ok(())
-}
-///
-/// Create Image View
-///
-fn create_image_view(
-    device: &Device,
-    image: vk::Image,
-    format: vk::Format,
-) -> Result<vk::ImageView> {
-    let subresource_range = vk::ImageSubresourceRange::builder()
-        .aspect_mask(vk::ImageAspectFlags::COLOR)
-        .base_mip_level(0)
-        .level_count(1)
-        .base_array_layer(0)
-        .layer_count(1);
-
-    let info = vk::ImageViewCreateInfo::builder()
-        .image(image)
-        .view_type(vk::ImageViewType::_2D)
-        .format(format)
-        .subresource_range(subresource_range);
-
-    Ok(unsafe { device.create_image_view(&info, None)? })
 }
