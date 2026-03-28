@@ -20,7 +20,6 @@ use std::ptr::copy_nonoverlapping as memcpy;
 pub fn read_image(path: &str) -> Result<DynamicImage> {
     let start = std::time::Instant::now();
     let image = ImageReader::open(path)?.decode()?;
-    println!("{:?}", start.elapsed());
     Ok(image)
 }
 
@@ -37,15 +36,9 @@ pub fn create_texture_image(
 
     let (width, height) = image_rgba.dimensions();
 
-    println!("{0}", width);
-
-    println!("{0}", height);
-
     let pixels = image_rgba.as_raw();
 
     let size = pixels.len() as u64;
-
-    println!("read image");
 
     let (staging_buffer, staging_buffer_memory) = tool::create_buffer(
         instance,

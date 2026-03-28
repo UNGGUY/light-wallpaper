@@ -44,8 +44,6 @@ fn main() {
         height: 0,
     };
 
-    println!("Starting the example window app, press <ESC> to quit.");
-
     while state.running {
         event_queue.blocking_dispatch(&mut state).unwrap();
 
@@ -54,15 +52,10 @@ fn main() {
 
             let surface_ptr = state.base_surface.as_ref().unwrap().id().as_ptr() as *mut c_void;
 
-            println!("{0}", state.width);
-
-            println!("{0}", state.height);
-
             state.context = Some(
                 Context::create_for_wayland(surface_ptr, display_ptr, state.width, state.height)
                     .unwrap(),
             );
-            println!("success");
         }
 
         if state.configured && state.render {
@@ -108,7 +101,6 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
         {
             match &interface[..] {
                 "wl_compositor" => {
-                    println!("wl_compositor");
                     let compositor =
                         registry.bind::<wl_compositor::WlCompositor, _, _>(name, 1, qh, ());
                     let surface = compositor.create_surface(qh, ());
@@ -143,7 +135,6 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                 //     }
                 // }
                 "wl_seat" => {
-                    println!("wl_seat");
                     registry.bind::<wl_seat::WlSeat, _, _>(name, 1, qh, ());
                 }
                 // "xdg_wm_base" => {
@@ -235,8 +226,6 @@ impl State {
         base_surface.commit();
 
         self.layer_surface = Some(layer_surface);
-
-        println!("layer_surface success");
     }
 }
 
@@ -370,7 +359,6 @@ impl Dispatch<ZwlrLayerSurfaceV1, ()> for State {
             state.height = height;
             state.configured = true;
             state.render = true;
-            println!("zwlrsurface event");
             let surface = state.base_surface.as_ref().unwrap();
             // if let Some(ref buffer) = state.buffer {
             //     surface.attach(Some(buffer), 0, 0);

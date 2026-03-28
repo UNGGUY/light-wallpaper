@@ -140,21 +140,13 @@ impl Context {
 
         data.msaa_samples = msaa::get_max_msaa_samples(&instance, &data);
 
-        println!("msaa : {:?}", data.msaa_samples);
-
-        println!("create device success");
-
         //create swapchain
         create_swapchain_wayland(width, height, &instance, &device, &mut data)?;
 
         create_swapchain_image_view(&device, &mut data)?;
 
-        println!("create swapchain success");
-
         // create render pass
         create_render_pass(&device, &mut data)?;
-
-        println!("create render pass success");
 
         //create descriptor set
         create_descriptor_set_layout(&device, &mut data)?;
@@ -167,24 +159,17 @@ impl Context {
 
         msaa::create_color_objects(&instance, &device, &mut data)?;
 
-        println!("create pipeline success");
         // create frame
         create_frame_buffers(&device, &mut data)?;
 
-        println!("create frame success");
-
         //create image
         texture::create_texture_image(&instance, &device, &mut data, &image)?;
-        println!("create image success");
         texture::create_texture_image_view(&device, &mut data)?;
-        println!("create image success");
         texture::create_texture_sampler(&device, &mut data)?;
-        println!("create image success");
 
         // create vertex
         create_vertex_buffer(&instance, &device, &mut data)?;
 
-        println!("create vertex success");
         // create index
         create_index_buffer(&instance, &device, &mut data)?;
 
@@ -225,19 +210,13 @@ impl Context {
 
         let device = create_logical_device(&instance, &mut data)?;
 
-        println!("create device success");
-
         //create swapchain
         create_swapchain(window, &instance, &device, &mut data)?;
 
         create_swapchain_image_view(&device, &mut data)?;
 
-        println!("create swapchain success");
-
         // create render pass
         create_render_pass(&device, &mut data)?;
-
-        println!("create render pass success");
 
         //create descriptor set
         create_descriptor_set_layout(&device, &mut data)?;
@@ -245,27 +224,20 @@ impl Context {
         // create pipeline
         create_pipeline(&device, &mut data)?;
 
-        println!("create pipeline success");
         // create frame
         create_frame_buffers(&device, &mut data)?;
-
-        println!("create frame success");
 
         //create command
         create_command_pool(&instance, &device, &mut data)?;
 
         //create image
         texture::create_texture_image(&instance, &device, &mut data, &image)?;
-        println!("create image success");
         texture::create_texture_image_view(&device, &mut data)?;
-        println!("create image success");
         texture::create_texture_sampler(&device, &mut data)?;
-        println!("create image success");
 
         // create vertex
         create_vertex_buffer(&instance, &device, &mut data)?;
 
-        println!("create vertex success");
         // create index
         create_index_buffer(&instance, &device, &mut data)?;
 
@@ -288,7 +260,6 @@ impl Context {
     }
 
     pub fn render_wayland(&mut self) -> Result<()> {
-        println!("{0}", self.frame);
         let in_flight_fence = self.data.in_flight_fences[self.frame];
         unsafe {
             self.device
@@ -318,8 +289,6 @@ impl Context {
         self.data.image_in_flight[image_index] = in_flight_fence;
 
         self.update_uniform_buffer(image_index)?;
-
-        println!("{0}", image_index);
 
         let wait_semaphores = &[self.data.image_available_semaphore[self.frame]];
         let wait_stages = &[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
@@ -358,7 +327,6 @@ impl Context {
 
     #[allow(unused_variables)]
     pub fn render(&mut self, window: &Window) -> Result<()> {
-        println!("{0}", self.frame);
         let in_flight_fence = self.data.in_flight_fences[self.frame];
         unsafe {
             self.device
@@ -388,8 +356,6 @@ impl Context {
         };
 
         self.data.image_in_flight[image_index] = in_flight_fence;
-
-        println!("{0}", image_index);
 
         let wait_semaphores = &[self.data.image_available_semaphore[self.frame]];
         let wait_stages = &[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
@@ -504,8 +470,6 @@ impl Context {
             self.data.swapchain_extent.width as f32,
             self.data.swapchain_extent.height as f32,
         );
-
-        println!("{0}", i_time);
 
         let ubo = UniformBufferObject {
             i_time,
@@ -1431,8 +1395,6 @@ fn create_descriptor_sets(device: &Device, data: &mut ContextData) -> Result<()>
         .descriptor_pool(data.descriptor_pool)
         .set_layouts(&layouts);
     data.descriptor_sets = unsafe { device.allocate_descriptor_sets(&allocate_info)? };
-
-    println!("{0}", data.swapchain_images.len());
 
     for i in 0..data.swapchain_images.len() {
         let info = vk::DescriptorBufferInfo::builder()
