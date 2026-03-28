@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::collections::HashSet;
 use std::ffi::c_void;
 use std::ptr::copy_nonoverlapping as memcpy;
@@ -51,8 +52,6 @@ const VALIDATION_LAYER: vk::ExtensionName =
     vk::ExtensionName::from_bytes(b"VK_LAYER_KHRONOS_validation");
 
 const DEVICE_EXTENSIONS: &[vk::ExtensionName] = &[vk::KHR_SWAPCHAIN_EXTENSION.name];
-
-const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
 pub struct Context {
     instance: Instance,
@@ -193,6 +192,7 @@ impl Context {
         })
     }
 
+    #[allow(unused)]
     pub fn create(window: &Window) -> Result<Self> {
         let loader = unsafe { LibloadingLoader::new(LIBRARY)? };
 
@@ -325,7 +325,7 @@ impl Context {
         Ok(())
     }
 
-    #[allow(unused_variables)]
+    #[allow(unused_variables, unused)]
     pub fn render(&mut self, window: &Window) -> Result<()> {
         let in_flight_fence = self.data.in_flight_fences[self.frame];
         unsafe {

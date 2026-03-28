@@ -3,7 +3,6 @@ use crate::context::tool;
 
 use anyhow::{Result, anyhow};
 use image::DynamicImage;
-use image::GenericImageView;
 use image::ImageReader;
 
 use vulkanalia::Device;
@@ -18,7 +17,6 @@ use vulkanalia::vk::ImageLayout;
 use std::ptr::copy_nonoverlapping as memcpy;
 
 pub fn read_image(path: &str) -> Result<DynamicImage> {
-    let start = std::time::Instant::now();
     let image = ImageReader::open(path)?.decode()?;
     Ok(image)
 }
@@ -271,20 +269,6 @@ pub fn create_texture_sampler(device: &Device, data: &mut ContextData) -> Result
         .compare_enable(false)
         .compare_op(vk::CompareOp::ALWAYS);
 
-    let info2 = vk::SamplerCreateInfo::builder()
-        .mag_filter(vk::Filter::NEAREST)
-        .min_filter(vk::Filter::NEAREST)
-        .mipmap_mode(vk::SamplerMipmapMode::NEAREST)
-        .address_mode_w(vk::SamplerAddressMode::REPEAT)
-        .address_mode_u(vk::SamplerAddressMode::REPEAT)
-        .address_mode_v(vk::SamplerAddressMode::REPEAT)
-        .anisotropy_enable(false)
-        .max_anisotropy(16.0)
-        .border_color(vk::BorderColor::INT_OPAQUE_BLACK)
-        .unnormalized_coordinates(false)
-        .compare_enable(false)
-        .compare_op(vk::CompareOp::ALWAYS);
-
-    data.texture_image_sampler = unsafe { device.create_sampler(&info2, None)? };
+    data.texture_image_sampler = unsafe { device.create_sampler(&info, None)? };
     Ok(())
 }

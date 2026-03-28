@@ -1,3 +1,4 @@
+#![allow(unused)]
 use anyhow::Result;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
@@ -24,7 +25,6 @@ impl App {
         self.window = Some(event_loop.create_window(WindowAttributes::default())?);
         Ok(())
     }
-
     fn create_context(&mut self) -> Result<()> {
         self.context = Some(Context::create(self.window.as_ref().unwrap()).unwrap());
         Ok(())
