@@ -1,11 +1,15 @@
-/* This animation is the material of my first youtube tutorial about creative 
-   coding, which is a video in which I try to introduce programmers to GLSL 
-   and to the wonderful world of shaders, while also trying to share my recent 
-   passion for this community.
-                                       Video URL: https://youtu.be/f4s1h2YETNY
-*/
-
 #version 450
+
+
+layout(binding = 0) uniform UniformBufferObject{
+  float iTime;
+  vec2 iResolution;
+}ubo;
+
+layout(location = 0) in vec2 fragTexCoord;
+
+layout(location = 0) out vec4 outColor;
+
 //https://iquilezles.org/articles/palettes/
 vec3 palette( float t ) {
     vec3 a = vec3(0.5, 0.5, 0.5);
@@ -17,8 +21,8 @@ vec3 palette( float t ) {
 }
 
 //https://www.shadertoy.com/view/mtyGWy
-void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
-    vec2 uv = (fragCoord * 2.0 - iResolution.xy) / iResolution.y;
+void main() {
+    vec2 uv = (gl_FragCoord.xy * 2.0 - ubo.iResolution.xy) / ubo.iResolution.y;
     vec2 uv0 = uv;
     vec3 finalColor = vec3(0.0);
     
@@ -27,15 +31,17 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 
         float d = length(uv) * exp(-length(uv0));
 
-        vec3 col = palette(length(uv0) + i*.4 + iTime*.4);
+        vec3 col = palette(length(uv0) + i*.4 + ubo.iTime*.4);
 
-        d = sin(d*8. + iTime)/8.;
+        d = sin(d*8. + ubo.iTime)/8.;
         d = abs(d);
 
         d = pow(0.01 / d, 1.2);
 
         finalColor += col * d;
     }
-        
-    fragColor = vec4(finalColor, 1.0);
+
+
+    outColor= vec4(finalColor, 1.0);
+
 }

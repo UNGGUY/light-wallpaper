@@ -72,7 +72,7 @@ fn main() {
             if let Some(surface) = state.base_surface.as_ref() {
                 surface.commit();
             }
-            state.render = false;
+            //state.render = false;
         }
     }
 }

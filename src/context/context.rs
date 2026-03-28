@@ -1,8 +1,13 @@
 use std::collections::HashSet;
 use std::ffi::c_void;
 use std::ptr::copy_nonoverlapping as memcpy;
+use std::time::Instant;
 
+use cgmath::vec2;
+
+use crate::context::UniformBufferObject;
 use crate::context::Vertex;
+use crate::context::uniform::create_uniform_buffers;
 use crate::context::vertex;
 use image::DynamicImage;
 use vertex::VERTICES;
@@ -54,6 +59,8 @@ pub struct Context {
     data: ContextData,
     device: Device,
     frame: usize,
+
+    start: Instant,
     image: DynamicImage,
 }
 
@@ -64,7 +71,7 @@ pub struct ContextData {
     pub(crate) present_queue: vk::Queue,
     surface: vk::SurfaceKHR,
     swapchain: vk::SwapchainKHR,
-    swapchain_image: Vec<vk::Image>,
+    pub(crate) swapchain_images: Vec<vk::Image>,
     pub(crate) swapchain_format: vk::Format,
     pub(crate) swapchain_extent: vk::Extent2D,
     swapchain_image_view: Vec<vk::ImageView>,
@@ -86,6 +93,9 @@ pub struct ContextData {
 
     index_buffer: vk::Buffer,
     index_buffer_memory: vk::DeviceMemory,
+
+    pub(crate) uniform_buffers: Vec<vk::Buffer>,
+    pub(crate) uniform_buffers_memory: Vec<vk::DeviceMemory>,
 
     pub(crate) texture_image: vk::Image,
     pub(crate) texture_image_memory: vk::DeviceMemory,
@@ -178,8 +188,10 @@ impl Context {
         // create index
         create_index_buffer(&instance, &device, &mut data)?;
 
+        create_uniform_buffers(&instance, &device, &mut data)?;
+
         // create descriptor
-        create_descroptor_pool(&device, &mut data)?;
+        create_descriptor_pool(&device, &mut data)?;
         create_descriptor_sets(&device, &mut data)?;
 
         create_command_buffers(&device, &mut data)?;
@@ -191,6 +203,7 @@ impl Context {
             data,
             device,
             frame: 0,
+            start: Instant::now(),
             image,
         })
     }
@@ -257,7 +270,7 @@ impl Context {
         create_index_buffer(&instance, &device, &mut data)?;
 
         // create descriptor
-        create_descroptor_pool(&device, &mut data)?;
+        create_descriptor_pool(&device, &mut data)?;
         create_descriptor_sets(&device, &mut data)?;
 
         create_command_buffers(&device, &mut data)?;
@@ -269,6 +282,7 @@ impl Context {
             data,
             device,
             frame: 0,
+            start: Instant::now(),
             image,
         })
     }
@@ -303,6 +317,8 @@ impl Context {
 
         self.data.image_in_flight[image_index] = in_flight_fence;
 
+        self.update_uniform_buffer(image_index)?;
+
         println!("{0}", image_index);
 
         let wait_semaphores = &[self.data.image_available_semaphore[self.frame]];
@@ -335,7 +351,7 @@ impl Context {
                 .queue_present_khr(self.data.present_queue, &present_info)?
         };
 
-        self.frame = (self.frame + 1) % self.data.swapchain_image.len();
+        self.frame = (self.frame + 1) % self.data.swapchain_images.len();
 
         Ok(())
     }
@@ -361,6 +377,8 @@ impl Context {
         };
 
         let image_fence = self.data.image_in_flight[image_index];
+
+        self.update_uniform_buffer(image_index);
 
         if !image_fence.is_null() {
             unsafe {
@@ -403,7 +421,7 @@ impl Context {
                 .queue_present_khr(self.data.present_queue, &present_info)?
         };
 
-        self.frame = (self.frame + 1) % self.data.swapchain_image.len();
+        self.frame = (self.frame + 1) % self.data.swapchain_images.len();
 
         Ok(())
     }
@@ -412,6 +430,15 @@ impl Context {
         unsafe {
             self.device
                 .free_command_buffers(self.data.command_pool, &self.data.command_buffers);
+
+            self.data
+                .uniform_buffers
+                .iter()
+                .for_each(|b| self.device.destroy_buffer(*b, None));
+            self.data
+                .uniform_buffers_memory
+                .iter()
+                .for_each(|m| self.device.free_memory(*m, None));
 
             self.device
                 .destroy_image_view(self.data.texture_image_view, None);
@@ -440,6 +467,8 @@ impl Context {
                 .frame_buffers
                 .iter()
                 .for_each(|f| self.device.destroy_framebuffer(*f, None));
+            self.device
+                .destroy_descriptor_set_layout(self.data.descriptor_set_layout, None);
             self.device.destroy_pipeline(self.data.pipeline, None);
             self.device
                 .destroy_pipeline_layout(self.data.pipeline_layout, None);
@@ -467,6 +496,40 @@ impl Context {
             self.device.destroy_device(None);
             self.instance.destroy_instance(None);
         }
+    }
+
+    fn update_uniform_buffer(&mut self, image_index: usize) -> Result<()> {
+        let i_time = self.start.elapsed().as_secs_f32();
+        let i_resolution = vec2(
+            self.data.swapchain_extent.width as f32,
+            self.data.swapchain_extent.height as f32,
+        );
+
+        println!("{0}", i_time);
+
+        let ubo = UniformBufferObject {
+            i_time,
+            _padding: 0.0,
+            i_resolution,
+        };
+
+        let memory = unsafe {
+            self.device.map_memory(
+                self.data.uniform_buffers_memory[image_index],
+                0,
+                size_of::<UniformBufferObject>() as u64,
+                vk::MemoryMapFlags::empty(),
+            )?
+        };
+
+        unsafe {
+            memcpy(&ubo, memory.cast(), 1);
+
+            self.device
+                .unmap_memory(self.data.uniform_buffers_memory[image_index]);
+        }
+
+        Ok(())
     }
 }
 
@@ -734,7 +797,7 @@ fn create_swapchain(
         .old_swapchain(vk::SwapchainKHR::null());
 
     data.swapchain = unsafe { device.create_swapchain_khr(&swapchain_info, None)? };
-    data.swapchain_image = unsafe { device.get_swapchain_images_khr(data.swapchain)? };
+    data.swapchain_images = unsafe { device.get_swapchain_images_khr(data.swapchain)? };
     data.swapchain_format = surface_format.format;
     data.swapchain_extent = extent2d;
 
@@ -836,7 +899,7 @@ fn create_swapchain_wayland(
         .old_swapchain(vk::SwapchainKHR::null());
 
     data.swapchain = unsafe { device.create_swapchain_khr(&swapchain_info, None)? };
-    data.swapchain_image = unsafe { device.get_swapchain_images_khr(data.swapchain)? };
+    data.swapchain_images = unsafe { device.get_swapchain_images_khr(data.swapchain)? };
     data.swapchain_format = surface_format.format;
     data.swapchain_extent = extent2d;
 
@@ -868,7 +931,7 @@ fn get_swapchain_extent_wayland(
 ///
 fn create_swapchain_image_view(device: &Device, data: &mut ContextData) -> Result<()> {
     data.swapchain_image_view = data
-        .swapchain_image
+        .swapchain_images
         .iter()
         .map(|i| {
             let components = vk::ComponentMapping::builder()
@@ -1322,13 +1385,19 @@ fn copy_buffer(
 /// Create descriptor
 ///
 fn create_descriptor_set_layout(device: &Device, data: &mut ContextData) -> Result<()> {
+    let ubo_binding = vk::DescriptorSetLayoutBinding::builder()
+        .binding(0)
+        .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+        .descriptor_count(1)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
+
     let sampler_binding = vk::DescriptorSetLayoutBinding::builder()
         .binding(1)
         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
         .descriptor_count(1)
         .stage_flags(vk::ShaderStageFlags::FRAGMENT);
 
-    let bindings = &[sampler_binding];
+    let bindings = &[ubo_binding, sampler_binding];
     let info = DescriptorSetLayoutCreateInfo::builder().bindings(bindings);
 
     data.descriptor_set_layout = unsafe { device.create_descriptor_set_layout(&info, None)? };
@@ -1336,29 +1405,49 @@ fn create_descriptor_set_layout(device: &Device, data: &mut ContextData) -> Resu
     Ok(())
 }
 
-fn create_descroptor_pool(device: &Device, data: &mut ContextData) -> Result<()> {
+fn create_descriptor_pool(device: &Device, data: &mut ContextData) -> Result<()> {
+    let ubo_size = vk::DescriptorPoolSize::builder()
+        .type_(vk::DescriptorType::UNIFORM_BUFFER)
+        .descriptor_count(data.swapchain_images.len() as u32);
+
     let sampler_size = vk::DescriptorPoolSize::builder()
         .type_(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .descriptor_count(data.swapchain_image.len() as u32);
+        .descriptor_count(data.swapchain_images.len() as u32);
 
-    let pool_sizes = &[sampler_size];
+    let pool_sizes = &[ubo_size, sampler_size];
 
     let info = vk::DescriptorPoolCreateInfo::builder()
         .pool_sizes(pool_sizes)
-        .max_sets(data.swapchain_image.len() as u32);
+        .max_sets(data.swapchain_images.len() as u32);
 
     data.descriptor_pool = unsafe { device.create_descriptor_pool(&info, None)? };
+
     Ok(())
 }
 
 fn create_descriptor_sets(device: &Device, data: &mut ContextData) -> Result<()> {
-    let layouts = vec![data.descriptor_set_layout; data.swapchain_image.len()];
+    let layouts = vec![data.descriptor_set_layout; data.swapchain_images.len()];
     let allocate_info = vk::DescriptorSetAllocateInfo::builder()
         .descriptor_pool(data.descriptor_pool)
         .set_layouts(&layouts);
     data.descriptor_sets = unsafe { device.allocate_descriptor_sets(&allocate_info)? };
 
-    for i in 0..data.swapchain_image.len() {
+    println!("{0}", data.swapchain_images.len());
+
+    for i in 0..data.swapchain_images.len() {
+        let info = vk::DescriptorBufferInfo::builder()
+            .buffer(data.uniform_buffers[i])
+            .offset(0)
+            .range(size_of::<UniformBufferObject>() as u64);
+
+        let buffer_info = &[info];
+        let ubo_write = vk::WriteDescriptorSet::builder()
+            .dst_set(data.descriptor_sets[i])
+            .dst_binding(0)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .buffer_info(buffer_info);
+
         let image_info = vk::DescriptorImageInfo::builder()
             .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
             .image_view(data.texture_image_view)
@@ -1373,7 +1462,8 @@ fn create_descriptor_sets(device: &Device, data: &mut ContextData) -> Result<()>
             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
             .image_info(image_infos);
         unsafe {
-            device.update_descriptor_sets(&[sampler_set], &[] as &[vk::CopyDescriptorSet]);
+            device
+                .update_descriptor_sets(&[ubo_write, sampler_set], &[] as &[vk::CopyDescriptorSet]);
         }
     }
 
@@ -1384,7 +1474,7 @@ fn create_sync_objects(device: &Device, data: &mut ContextData) -> Result<()> {
     let semaphore_info = vk::SemaphoreCreateInfo::builder();
     let fence_info = vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED);
 
-    for _ in 0..data.swapchain_image.len() {
+    for _ in 0..data.swapchain_images.len() {
         data.image_available_semaphore
             .push(unsafe { device.create_semaphore(&semaphore_info, None)? });
 
@@ -1396,7 +1486,7 @@ fn create_sync_objects(device: &Device, data: &mut ContextData) -> Result<()> {
     }
 
     data.image_in_flight = data
-        .swapchain_image
+        .swapchain_images
         .iter()
         .map(|_| vk::Fence::null())
         .collect();
