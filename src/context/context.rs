@@ -192,7 +192,6 @@ impl Context {
         })
     }
 
-    #[allow(unused)]
     pub fn create(window: &Window) -> Result<Self> {
         let loader = unsafe { LibloadingLoader::new(LIBRARY)? };
 
@@ -325,7 +324,6 @@ impl Context {
         Ok(())
     }
 
-    #[allow(unused_variables, unused)]
     pub fn render(&mut self, window: &Window) -> Result<()> {
         let in_flight_fence = self.data.in_flight_fences[self.frame];
         unsafe {
@@ -920,7 +918,6 @@ fn create_swapchain_image_view(device: &Device, data: &mut ContextData) -> Resul
 
             match unsafe { device.create_image_view(&image_info, None) } {
                 Ok(t) => t,
-                #[allow(unused_variables)]
                 Err(e) => ImageView::null(),
             }
         })
