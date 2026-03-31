@@ -8,15 +8,14 @@ use cgmath::vec2;
 
 use crate::context::UniformBufferObject;
 use crate::context::Vertex;
-use crate::context::uniform::create_uniform_buffers;
-use crate::context::vertex;
-use image::DynamicImage;
-use vertex::VERTICES;
-
-use crate::context::tool;
-
 use crate::context::msaa;
 use crate::context::texture;
+use crate::context::tool;
+use crate::context::uniform::create_uniform_buffers;
+use crate::context::vertex;
+
+use image::DynamicImage;
+use vertex::VERTICES;
 
 use anyhow::{Result, anyhow};
 use vulkanalia::Device;
@@ -100,6 +99,7 @@ pub struct ContextData {
     pub(crate) texture_image_memory: vk::DeviceMemory,
     pub(crate) texture_image_view: vk::ImageView,
     pub(crate) texture_image_sampler: vk::Sampler,
+    pub(crate) mip_levels: u32,
 
     // Msaa
     pub(crate) color_image: vk::Image,

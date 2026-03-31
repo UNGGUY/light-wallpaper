@@ -19,6 +19,7 @@ pub fn create_color_objects(
         data,
         data.swapchain_extent.width,
         data.swapchain_extent.height,
+        1,
         data.swapchain_format,
         vk::ImageTiling::OPTIMAL,
         data.msaa_samples,
@@ -30,7 +31,7 @@ pub fn create_color_objects(
     data.color_image_memory = color_image_memory;
 
     data.color_image_view =
-        tool::create_image_view(device, data.color_image, data.swapchain_format)?;
+        tool::create_image_view(device, data.color_image, data.swapchain_format, 1)?;
 
     Ok(())
 }

@@ -6,6 +6,9 @@ use vulkanalia::vk;
 use vulkanalia::vk::DeviceV1_0;
 use vulkanalia::vk::HasBuilder;
 use vulkanalia::vk::InstanceV1_0;
+
+use vulkanalia::vk::CommandBufferBeginInfo;
+use vulkanalia::vk::Handle;
 ///
 /// Get Memory type index
 ///
@@ -67,6 +70,7 @@ pub fn create_image(
     data: &mut ContextData,
     width: u32,
     height: u32,
+    mip_levels: u32,
     format: vk::Format,
     tiling: vk::ImageTiling,
     samples: vk::SampleCountFlags,
@@ -80,7 +84,7 @@ pub fn create_image(
             height,
             depth: 1,
         })
-        .mip_levels(1)
+        .mip_levels(mip_levels)
         .array_layers(1)
         .format(format)
         .tiling(tiling)
@@ -116,11 +120,12 @@ pub fn create_image_view(
     device: &Device,
     image: vk::Image,
     format: vk::Format,
+    mip_levels: u32,
 ) -> Result<vk::ImageView> {
     let subresource_range = vk::ImageSubresourceRange::builder()
         .aspect_mask(vk::ImageAspectFlags::COLOR)
         .base_mip_level(0)
-        .level_count(1)
+        .level_count(mip_levels)
         .base_array_layer(0)
         .layer_count(1);
 
@@ -131,4 +136,43 @@ pub fn create_image_view(
         .subresource_range(subresource_range);
 
     Ok(unsafe { device.create_image_view(&info, None)? })
+}
+
+pub fn begin_single_time_commands(
+    device: &Device,
+    data: &ContextData,
+) -> Result<vk::CommandBuffer> {
+    let allocate_info = vk::CommandBufferAllocateInfo::builder()
+        .level(vk::CommandBufferLevel::PRIMARY)
+        .command_pool(data.command_pool)
+        .command_buffer_count(1);
+
+    let command_buffer = unsafe { device.allocate_command_buffers(&allocate_info)?[0] };
+
+    let begin_info =
+        CommandBufferBeginInfo::builder().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+
+    unsafe { device.begin_command_buffer(command_buffer, &begin_info)? }
+
+    Ok(command_buffer)
+}
+
+pub fn end_single_time_commands(
+    device: &Device,
+    data: &ContextData,
+    command_buffer: vk::CommandBuffer,
+) -> Result<()> {
+    unsafe { device.end_command_buffer(command_buffer)? };
+
+    let command_buffers = &[command_buffer];
+    let submit_info = vk::SubmitInfo::builder().command_buffers(command_buffers);
+
+    unsafe {
+        device.queue_submit(data.graphics_queue, &[submit_info], vk::Fence::null())?;
+        device.queue_wait_idle(data.graphics_queue)?;
+
+        device.free_command_buffers(data.command_pool, command_buffers);
+    }
+
+    Ok(())
 }

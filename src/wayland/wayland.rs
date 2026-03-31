@@ -9,7 +9,7 @@ use wayland_client::{
 
 use crate::wayland::wlr_layer_shell::my_protocol::{
     zwlr_layer_shell_v1::{Layer, ZwlrLayerShellV1},
-    zwlr_layer_surface_v1::{self, ZwlrLayerSurfaceV1},
+    zwlr_layer_surface_v1::{self, Anchor, ZwlrLayerSurfaceV1},
 };
 
 use crate::context::Context;
@@ -20,11 +20,9 @@ pub struct State {
     pub(crate) configured: bool,
     pub(crate) render: bool,
     pub(crate) context: Option<Context>,
-
     pub(crate) layer_shell: Option<ZwlrLayerShellV1>,
     pub(crate) layer_surface: Option<ZwlrLayerSurfaceV1>,
     pub(crate) output: Option<wl_output::WlOutput>,
-
     pub(crate) width: u32,
     pub(crate) height: u32,
 }
@@ -102,8 +100,12 @@ impl State {
             (),
         );
 
-        // 设置大小为输出分辨率
-        layer_surface.set_size(1920, 1080);
+        // 铺满屏幕
+        layer_surface.set_anchor(
+            Anchor::Top | Anchor::Bottom | Anchor::Left | Anchor::Right,
+        );
+        // 大小设为 0，让 compositor 根据 output 原生分辨率发送 configure
+        layer_surface.set_size(0, 0);
 
         // 提交 surface
         base_surface.commit();

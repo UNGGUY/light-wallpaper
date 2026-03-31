@@ -19,7 +19,7 @@
         # 在 Nixpkgs 中，vulkan-loader 通常不直接包含 ICD json，需要依赖 mesa 或具体的驱动包
         # 为了通用性，我们尝试从 pkgs.mesa.drivers 或系统路径查找，或者让 loader 自动发现
         # 但在纯 Nix Shell 中，最好显式指向 mesa 的 vulkan icd
-        mesa-pkg = pkgs.mesa.drivers; 
+        mesa-pkg = pkgs.mesa; 
       in {
         devShells.default = with pkgs; mkShell rec {
           buildInputs = [

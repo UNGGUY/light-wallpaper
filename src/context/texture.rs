@@ -1,4 +1,5 @@
 use crate::context::ContextData;
+use crate::context::mipmap;
 use crate::context::tool;
 
 use anyhow::{Result, anyhow};
@@ -8,9 +9,7 @@ use image::ImageReader;
 use vulkanalia::Device;
 use vulkanalia::Instance;
 use vulkanalia::vk;
-use vulkanalia::vk::CommandBufferBeginInfo;
 use vulkanalia::vk::DeviceV1_0;
-use vulkanalia::vk::Handle;
 use vulkanalia::vk::HasBuilder;
 use vulkanalia::vk::ImageLayout;
 
@@ -33,6 +32,8 @@ pub fn create_texture_image(
     let image_rgba = image.to_rgba8();
 
     let (width, height) = image_rgba.dimensions();
+
+    data.mip_levels = (width.max(height) as f32).log2().floor() as u32 + 1;
 
     let pixels = image_rgba.as_raw();
 
@@ -61,10 +62,13 @@ pub fn create_texture_image(
         data,
         width,
         height,
+        data.mip_levels,
         vk::Format::R8G8B8A8_SRGB,
         vk::ImageTiling::OPTIMAL,
         vk::SampleCountFlags::_1,
-        vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
+        vk::ImageUsageFlags::SAMPLED
+            | vk::ImageUsageFlags::TRANSFER_DST
+            | vk::ImageUsageFlags::TRANSFER_SRC,
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
     )?;
 
@@ -77,6 +81,7 @@ pub fn create_texture_image(
         vk::ImageLayout::UNDEFINED,
         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
         data.texture_image,
+        data.mip_levels,
     )?;
 
     copy_buffer_to_image(
@@ -88,54 +93,21 @@ pub fn create_texture_image(
         height,
     )?;
 
-    transition_image_layout(
-        device,
-        data,
-        vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-        vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-        data.texture_image,
-    )?;
-
     unsafe {
         device.destroy_buffer(staging_buffer, None);
         device.free_memory(staging_buffer_memory, None);
     }
 
-    Ok(())
-}
-
-fn begin_single_time_command(device: &Device, data: &ContextData) -> Result<vk::CommandBuffer> {
-    let allocate_info = vk::CommandBufferAllocateInfo::builder()
-        .level(vk::CommandBufferLevel::PRIMARY)
-        .command_pool(data.command_pool)
-        .command_buffer_count(1);
-
-    let command_buffer = unsafe { device.allocate_command_buffers(&allocate_info)?[0] };
-
-    let begin_info =
-        CommandBufferBeginInfo::builder().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-
-    unsafe { device.begin_command_buffer(command_buffer, &begin_info)? }
-
-    Ok(command_buffer)
-}
-
-fn end_single_time_command(
-    device: &Device,
-    data: &ContextData,
-    command_buffer: vk::CommandBuffer,
-) -> Result<()> {
-    unsafe { device.end_command_buffer(command_buffer)? };
-
-    let command_buffers = &[command_buffer];
-    let submit_info = vk::SubmitInfo::builder().command_buffers(command_buffers);
-
-    unsafe {
-        device.queue_submit(data.graphics_queue, &[submit_info], vk::Fence::null())?;
-        device.queue_wait_idle(data.graphics_queue)?;
-
-        device.free_command_buffers(data.command_pool, command_buffers);
-    }
+    mipmap::generate_mipmaps(
+        instance,
+        device,
+        data,
+        data.texture_image,
+        vk::Format::R8G8B8A8_SRGB,
+        width,
+        height,
+        data.mip_levels,
+    )?;
 
     Ok(())
 }
@@ -146,6 +118,7 @@ fn transition_image_layout(
     old_layout: ImageLayout,
     new_layout: ImageLayout,
     image: vk::Image,
+    mip_levels: u32,
 ) -> Result<()> {
     let (src_access_mask, dst_access_mask, src_stage_mask, dst_stage_mask) =
         match (old_layout, new_layout) {
@@ -164,12 +137,12 @@ fn transition_image_layout(
             _ => return Err(anyhow!("Unsupported image layout transition!")),
         };
 
-    let command_buffer = begin_single_time_command(device, data)?;
+    let command_buffer = tool::begin_single_time_commands(device, data)?;
 
     let subresource_range = vk::ImageSubresourceRange::builder()
         .aspect_mask(vk::ImageAspectFlags::COLOR)
         .base_mip_level(0)
-        .level_count(1)
+        .level_count(mip_levels)
         .base_array_layer(0)
         .layer_count(1);
 
@@ -195,7 +168,7 @@ fn transition_image_layout(
         );
     }
 
-    end_single_time_command(device, data, command_buffer)?;
+    tool::end_single_time_commands(device, data, command_buffer)?;
 
     Ok(())
 }
@@ -208,7 +181,7 @@ fn copy_buffer_to_image(
     width: u32,
     height: u32,
 ) -> Result<()> {
-    let command_buffer = begin_single_time_command(device, data)?;
+    let command_buffer = tool::begin_single_time_commands(device, data)?;
 
     let image_subresource = vk::ImageSubresourceLayers::builder()
         .aspect_mask(vk::ImageAspectFlags::COLOR)
@@ -238,7 +211,7 @@ fn copy_buffer_to_image(
         );
     }
 
-    end_single_time_command(device, data, command_buffer)?;
+    tool::end_single_time_commands(device, data, command_buffer)?;
     Ok(())
 }
 
@@ -246,8 +219,12 @@ fn copy_buffer_to_image(
 /// Create Texture ImageView
 ///
 pub fn create_texture_image_view(device: &Device, data: &mut ContextData) -> Result<()> {
-    data.texture_image_view =
-        tool::create_image_view(device, data.texture_image, vk::Format::R8G8B8A8_SRGB)?;
+    data.texture_image_view = tool::create_image_view(
+        device,
+        data.texture_image,
+        vk::Format::R8G8B8A8_SRGB,
+        data.mip_levels,
+    )?;
     Ok(())
 }
 
@@ -258,16 +235,19 @@ pub fn create_texture_sampler(device: &Device, data: &mut ContextData) -> Result
     let info = vk::SamplerCreateInfo::builder()
         .mag_filter(vk::Filter::LINEAR)
         .min_filter(vk::Filter::LINEAR)
-        .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
-        .address_mode_w(vk::SamplerAddressMode::REPEAT)
         .address_mode_u(vk::SamplerAddressMode::REPEAT)
         .address_mode_v(vk::SamplerAddressMode::REPEAT)
+        .address_mode_w(vk::SamplerAddressMode::REPEAT)
         .anisotropy_enable(true)
         .max_anisotropy(16.0)
         .border_color(vk::BorderColor::INT_OPAQUE_BLACK)
         .unnormalized_coordinates(false)
         .compare_enable(false)
-        .compare_op(vk::CompareOp::ALWAYS);
+        .compare_op(vk::CompareOp::ALWAYS)
+        .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
+        .min_lod(0.0)
+        .max_lod(data.mip_levels as f32)
+        .mip_lod_bias(0.0);
 
     data.texture_image_sampler = unsafe { device.create_sampler(&info, None)? };
     Ok(())
