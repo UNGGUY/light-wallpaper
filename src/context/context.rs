@@ -137,7 +137,8 @@ impl Context {
 
         let device = create_logical_device(&instance, &mut data)?;
 
-        data.msaa_samples = msaa::get_max_msaa_samples(&instance, &data);
+        // Wallpaper is 2D full-screen image; MSAA only blurs during resolve.
+        data.msaa_samples = vk::SampleCountFlags::_1;
 
         //create swapchain
         create_swapchain_wayland(width, height, &instance, &device, &mut data)?;
@@ -989,8 +990,7 @@ fn create_pipeline(device: &Device, data: &mut ContextData) -> Result<()> {
 
     let multisample_state = vk::PipelineMultisampleStateCreateInfo::builder()
         .rasterization_samples(data.msaa_samples)
-        .sample_shading_enable(true)
-        .min_sample_shading(0.2);
+        .sample_shading_enable(false);
 
     let attachment = vk::PipelineColorBlendAttachmentState::builder()
         .color_write_mask(vk::ColorComponentFlags::all())

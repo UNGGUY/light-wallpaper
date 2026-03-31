@@ -1,33 +1,3 @@
-// #version 450
-//
-// // 接收顶点着色器传来的纹理坐标
-// layout(location = 0) in vec2 fragTexCoord;
-//
-// // 声明纹理采样器
-// layout(binding = 1) uniform sampler2D texSampler;
-//
-// // 输出颜色到帧缓冲区的 Color Attachment 0
-// layout(location = 0) out vec4 outColor;
-//
-//
-// void main() {
-//
-//   outColor = texture(texSampler,fragTexCoord);
-// }
-
-// #version 450
-//
-// layout(location = 0) in vec2 fragTexCoord;
-// layout(binding = 1) uniform sampler2D texSampler;
-// layout(location = 0) out vec4 outColor;
-//
-//
-// void main() {
-//     outColor = textureBicubic(texSampler, fragTexCoord);
-// }
-//
-//
-
 #version 450
 
 layout(location = 0) in vec2 fragTexCoord;
@@ -38,41 +8,6 @@ layout(binding = 0) uniform UniformBufferObject {
 
 layout(binding = 1) uniform sampler2D texSampler;
 layout(location = 0) out vec4 outColor;
-
-
-// Bicubic 权重函数
-float cubic(float v) {
-    v = abs(v);
-    if (v <= 1.0) {
-        return (1.5 * v - 2.5) * v * v + 1.0;
-    } else if (v < 2.0) {
-        return ((-0.5 * v + 2.5) * v - 4.0) * v + 2.0;
-    } else {
-        return 0.0;
-    }
-}
-
-// Bicubic 采样函数
-vec4 textureBicubic(sampler2D tex, vec2 uv) {
-    vec2 texSize = vec2(textureSize(tex, 0));
-    vec2 coord = uv * texSize;
-    vec2 base = floor(coord - 0.5);
-    vec2 f = coord - base - 0.5;
-
-    vec4 sum = vec4(0.0);
-    float totalWeight = 0.0;
-
-    for (int j = -1; j <= 2; j++) {
-        for (int i = -1; i <= 2; i++) {
-            float w = cubic(float(i) - f.x) * cubic(float(j) - f.y);
-            vec2 sampleUV = (base + vec2(i, j) + 0.5) / texSize;
-            sum += textureLod(tex, sampleUV, 0.0) * w;
-            totalWeight += w;
-        }
-    }
-    return sum / totalWeight;
-}
-
 
 void main() {
     // 屏幕宽高比
@@ -93,5 +28,6 @@ void main() {
         uv.y = uv.y * scale + (1.0 - scale) * 0.5;
     }
 
-    outColor = textureBicubic(texSampler, uv);
+    // 使用硬件 bilinear + 强制第 0 层 mipmap，避免自定义 bicubic 的柔化
+    outColor = textureLod(texSampler, uv, 0.0);
 }

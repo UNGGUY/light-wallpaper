@@ -25,6 +25,7 @@ pub struct State {
     pub(crate) output: Option<wl_output::WlOutput>,
     pub(crate) width: u32,
     pub(crate) height: u32,
+    pub(crate) output_scale: i32,
 }
 
 impl Dispatch<wl_registry::WlRegistry, ()> for State {
@@ -43,7 +44,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
             match &interface[..] {
                 "wl_compositor" => {
                     let compositor =
-                        registry.bind::<wl_compositor::WlCompositor, _, _>(name, 1, qh, ());
+                        registry.bind::<wl_compositor::WlCompositor, _, _>(name, 4, qh, ());
                     let surface = compositor.create_surface(qh, ());
                     state.base_surface = Some(surface);
 
@@ -106,6 +107,9 @@ impl State {
         );
         // 大小设为 0，让 compositor 根据 output 原生分辨率发送 configure
         layer_surface.set_size(0, 0);
+
+        // 临时 hack：强制 2x 过采样，测试 fractional scaling 是否是锯齿来源
+        base_surface.set_buffer_scale(2);
 
         // 提交 surface
         base_surface.commit();
@@ -198,5 +202,8 @@ impl Dispatch<wl_output::WlOutput, ()> for State {
         conn: &Connection,
         qhandle: &QueueHandle<Self>,
     ) {
+        if let wl_output::Event::Scale { factor } = event {
+            state.output_scale = factor;
+        }
     }
 }

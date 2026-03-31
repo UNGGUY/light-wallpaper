@@ -36,6 +36,7 @@ pub fn create_color_objects(
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn get_max_msaa_samples(instance: &Instance, data: &ContextData) -> vk::SampleCountFlags {
     let properties = unsafe { instance.get_physical_device_properties(data.physical_device) };
     let counts = properties.limits.framebuffer_color_sample_counts

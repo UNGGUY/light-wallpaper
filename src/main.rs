@@ -29,6 +29,7 @@ fn main() {
         layer_surface: None,
         width: 0,
         height: 0,
+        output_scale: 1,
     };
 
     while state.running {
@@ -40,8 +41,13 @@ fn main() {
             let surface_ptr = state.base_surface.as_ref().unwrap().id().as_ptr() as *mut c_void;
 
             state.context = Some(
-                Context::create_for_wayland(surface_ptr, display_ptr, state.width, state.height)
-                    .unwrap(),
+                Context::create_for_wayland(
+                    surface_ptr,
+                    display_ptr,
+                    state.width * 2,
+                    state.height * 2,
+                )
+                .unwrap(),
             );
         }
 
