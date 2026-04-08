@@ -9,6 +9,8 @@ use vulkanalia::vk::InstanceV1_0;
 
 use vulkanalia::vk::CommandBufferBeginInfo;
 use vulkanalia::vk::Handle;
+
+use vulkanalia::vk::KhrSurfaceExtensionInstanceCommands;
 ///
 /// Get Memory type index
 ///
@@ -18,7 +20,9 @@ pub fn get_memory_type_index(
     properties: vk::MemoryPropertyFlags,
     requirements: vk::MemoryRequirements,
 ) -> Result<u32> {
-    let memroy = unsafe { instance.get_physical_device_memory_properties(data.physical_device) };
+    let memroy = unsafe {
+        instance.get_physical_device_memory_properties(data.device_manager.physical_device)
+    };
     (0..memroy.memory_type_count)
         .find(|i| {
             let suitable = (requirements.memory_type_bits & (1 << i)) != 0;
@@ -144,7 +148,7 @@ pub fn begin_single_time_commands(
 ) -> Result<vk::CommandBuffer> {
     let allocate_info = vk::CommandBufferAllocateInfo::builder()
         .level(vk::CommandBufferLevel::PRIMARY)
-        .command_pool(data.command_pool)
+        .command_pool(data.command_manager.pool)
         .command_buffer_count(1);
 
     let command_buffer = unsafe { device.allocate_command_buffers(&allocate_info)?[0] };
@@ -168,11 +172,87 @@ pub fn end_single_time_commands(
     let submit_info = vk::SubmitInfo::builder().command_buffers(command_buffers);
 
     unsafe {
-        device.queue_submit(data.graphics_queue, &[submit_info], vk::Fence::null())?;
-        device.queue_wait_idle(data.graphics_queue)?;
+        device.queue_submit(
+            data.device_queue.graphics_queue,
+            &[submit_info],
+            vk::Fence::null(),
+        )?;
+        device.queue_wait_idle(data.device_queue.graphics_queue)?;
 
-        device.free_command_buffers(data.command_pool, command_buffers);
+        device.free_command_buffers(data.command_manager.pool, command_buffers);
     }
 
     Ok(())
+}
+
+///
+/// QueueFamilyindices
+///
+pub struct QueueFamilyindices {
+    pub(crate) graphics: u32,
+    pub(crate) present: u32,
+}
+
+impl QueueFamilyindices {
+    pub fn get(
+        instance: &Instance,
+        physical_device: vk::PhysicalDevice,
+        surface: vk::SurfaceKHR,
+    ) -> Result<Self> {
+        let properties =
+            unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
+
+        let graphics = properties
+            .iter()
+            .position(|p| p.queue_flags.contains(vk::QueueFlags::GRAPHICS))
+            .map(|i| i as u32);
+
+        let mut present = None;
+
+        for (index, _) in properties.iter().enumerate() {
+            if unsafe {
+                instance.get_physical_device_surface_support_khr(
+                    physical_device,
+                    index as u32,
+                    surface,
+                )?
+            } {
+                present = Some(index as u32);
+                break;
+            }
+        }
+
+        if let (Some(graphics), Some(present)) = (graphics, present) {
+            Ok(Self { graphics, present })
+        } else {
+            Err(anyhow!("error"))
+        }
+    }
+}
+
+// SwapChain
+pub struct SwapChainSupport {
+    pub(crate) capabilities: vk::SurfaceCapabilitiesKHR,
+    pub(crate) formats: Vec<vk::SurfaceFormatKHR>,
+    pub(crate) present_modes: Vec<vk::PresentModeKHR>,
+}
+
+impl SwapChainSupport {
+    pub fn get(
+        instance: &Instance,
+        physical_device: vk::PhysicalDevice,
+        surface: vk::SurfaceKHR,
+    ) -> Result<Self> {
+        Ok(Self {
+            capabilities: unsafe {
+                instance.get_physical_device_surface_capabilities_khr(physical_device, surface)?
+            },
+            formats: unsafe {
+                instance.get_physical_device_surface_formats_khr(physical_device, surface)?
+            },
+            present_modes: unsafe {
+                instance.get_physical_device_surface_present_modes_khr(physical_device, surface)?
+            },
+        })
+    }
 }

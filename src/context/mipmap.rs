@@ -22,7 +22,7 @@ pub fn generate_mipmaps(
 ) -> Result<()> {
     // Support
 
-    if !unsafe { instance.get_physical_device_format_properties(data.physical_device, format) }
+    if !unsafe { instance.get_physical_device_format_properties(data.device_manager.physical_device, format) }
         .optimal_tiling_features
         .contains(vk::FormatFeatureFlags::SAMPLED_IMAGE_FILTER_LINEAR)
     {

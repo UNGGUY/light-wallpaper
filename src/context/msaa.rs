@@ -17,10 +17,10 @@ pub fn create_color_objects(
         instance,
         device,
         data,
-        data.swapchain_extent.width,
-        data.swapchain_extent.height,
+        data.swapchain.extent.width,
+        data.swapchain.extent.height,
         1,
-        data.swapchain_format,
+        data.swapchain.format,
         vk::ImageTiling::OPTIMAL,
         data.msaa_samples,
         vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSIENT_ATTACHMENT,
@@ -31,14 +31,15 @@ pub fn create_color_objects(
     data.color_image_memory = color_image_memory;
 
     data.color_image_view =
-        tool::create_image_view(device, data.color_image, data.swapchain_format, 1)?;
+        tool::create_image_view(device, data.color_image, data.swapchain.format, 1)?;
 
     Ok(())
 }
 
 #[allow(dead_code)]
 pub fn get_max_msaa_samples(instance: &Instance, data: &ContextData) -> vk::SampleCountFlags {
-    let properties = unsafe { instance.get_physical_device_properties(data.physical_device) };
+    let properties =
+        unsafe { instance.get_physical_device_properties(data.device_manager.physical_device) };
     let counts = properties.limits.framebuffer_color_sample_counts
         & properties.limits.framebuffer_depth_sample_counts;
     [

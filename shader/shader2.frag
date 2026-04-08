@@ -8,8 +8,7 @@ layout(binding = 0) uniform UniformBufferObject {
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    // 当前片段坐标
-    vec2 F = gl_FragCoord.xy;
+    vec2 F = vec2(gl_FragCoord.x, ubo.iResolution.y - gl_FragCoord.y);
 
     // Iterator and attenuation
     float i = 0.2;

@@ -44,8 +44,8 @@ fn main() {
                 Context::create_for_wayland(
                     surface_ptr,
                     display_ptr,
-                    state.width * 2,
-                    state.height * 2,
+                    state.width * (state.output_scale.max(1) as u32),
+                    state.height * (state.output_scale.max(1) as u32),
                 )
                 .unwrap(),
             );

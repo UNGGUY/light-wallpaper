@@ -1,6 +1,14 @@
+pub mod buffer;
+pub mod command;
 pub mod context;
+pub mod descriptor;
+pub mod device;
+pub mod instance;
 pub mod mipmap;
 pub mod msaa;
+pub mod pipeline;
+pub mod swapchain;
+pub mod sync;
 pub mod texture;
 pub mod tool;
 pub mod uniform;
@@ -8,5 +16,11 @@ pub mod vertex;
 
 pub use context::Context;
 pub use context::ContextData;
+pub use descriptor::DescriptorManager;
+pub use device::DeviceManager;
+pub use device::DeviceQueue;
+pub use pipeline::Pipeline;
+pub use swapchain::Swapchain;
+pub use sync::SyncObjects;
 pub use uniform::UniformBufferObject;
 pub use vertex::Vertex;

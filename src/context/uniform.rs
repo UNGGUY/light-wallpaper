@@ -24,7 +24,7 @@ pub fn create_uniform_buffers(
     data.uniform_buffers.clear();
     data.uniform_buffers_memory.clear();
 
-    for _ in 0..data.swapchain_images.len() {
+    for _ in 0..data.swapchain.images.len() {
         let (uniform_buffer, uniform_buffer_memory) = tool::create_buffer(
             instance,
             device,
