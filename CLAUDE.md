@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (kimi.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -39,17 +39,30 @@ The main loop is a Wayland event queue that owns `State`. `Context` (Vulkan) is 
 
 ### Vulkan Context (`src/context/`)
 
-- `context.rs`: The main `Context` struct. Holds `ContextData` (physical device, swapchain, pipeline, framebuffers, command buffers, sync objects, etc.) and the `Device`/`Instance`. Two constructors exist: `create_for_wayland` (used by main) and `create` (winit backend). `render_wayland` acquires an image, updates the uniform buffer, submits the command buffer, and presents.
+- `mod.rs`: Module exports. Re-exports `Context`, `ContextData`, `DescriptorManager`, `DeviceManager`, `DeviceQueue`, `Pipeline`, `Swapchain`, `SyncObjects`, `UniformBufferObject`, and `Vertex`.
+- `context.rs`: The main `Context` struct. Owns `Instance`, `Device`, `ContextData`, and the wallpaper image. Two constructors exist: `create_for_wayland` (used by main) and `create` (winit backend). `render_wayland` acquires an image, updates the uniform buffer, submits the command buffer, and presents.
+- `instance.rs`: Instance creation. `create_instance` for winit (uses `vk_window::get_required_instance_extensions`) and `create_instance_wayland` for Wayland (explicitly enables `KHR_SURFACE` and `KHR_WAYLAND_SURFACE`).
+- `device.rs`: Physical and logical device management. `DeviceManager` selects a suitable GPU (requires swapchain support and anisotropic filtering). `create_logical_device` creates the `Device` with graphics/present queues and enables `sampler_anisotropy` and `sample_rate_shading` features.
+- `swapchain.rs`: `Swapchain` struct with `create_for_winit` and `create_for_wayland` variants. Handles surface format selection (prefers `R8G8B8A8_SRGB`), present mode selection (prefers `MAILBOX`), and image view creation.
+- `pipeline.rs`: `Pipeline` struct containing the graphics pipeline, layout, and render pass. Supports both MSAA and non-MSAA render pass configurations based on `msaa_samples`.
+- `descriptor.rs`: `DescriptorManager` handles descriptor set layout (uniform buffer at binding 0, combined image sampler at binding 1), descriptor pool allocation, and descriptor set updates.
+- `command.rs`: `CommandManager` creates the command pool and allocates primary command buffers.
+- `sync.rs`: `SyncObjects` creates per-frame semaphores (`image_available`, `render_finished`) and fences for GPU/CPU synchronization.
 - `texture.rs`: Loads the hardcoded image `assets/wallhaven-3q3wj3.jpg`, stages it to GPU, generates mipmaps, and creates the image view + sampler (`LINEAR` mag/min, anisotropic, `LINEAR` mipmap mode).
 - `mipmap.rs`: Generates mipmaps with `cmd_blit_image` and `Filter::LINEAR`.
-- `msaa.rs`: Creates MSAA color resolve targets; `msaa_samples` is queried from the physical device limits.
-- `vertex.rs`: Defines a full-screen quad with position and UV attributes.
+- `msaa.rs`: `create_color_objects` creates MSAA color resolve targets; `get_max_msaa_samples` queries physical device limits. In `create_for_wayland`, MSAA is disabled (`msaa_samples = _1`) for 2D wallpapers.
+- `vertex.rs`: Defines a full-screen quad with position and UV attributes. `VERTICES` and `INDICES` constants define the quad geometry.
 - `uniform.rs`: Defines `UniformBufferObject { i_time, _padding, i_resolution }` and allocates one uniform buffer per swapchain image.
-- `tool.rs`: Helpers for buffer/image creation, memory type queries, and one-time command buffers.
+- `buffer.rs`: `Buffer` struct for creating vertex and index buffers. Uses staging buffers for device-local index buffers.
+- `tool.rs`: Low-level helpers for buffer/image creation (`create_buffer`, `create_image`), memory type queries (`get_memory_type_index`), image view creation (`create_image_view`), one-time command buffers, and swapchain/queue family support queries.
 
 ### Alternate Window Backend (`src/app/`)
 
 `app.rs` provides a winit-based `ApplicationHandler` and a `Context::create` path. This is an alternative desktop window backend and is **not** used by the main Wayland wallpaper flow.
+
+
+### Wallpaper Manager (src/wallpaper/)
+
 
 ## Important Behavior Details
 

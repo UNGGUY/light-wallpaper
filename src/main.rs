@@ -7,6 +7,7 @@ use wayland::State;
 
 mod app;
 mod context;
+mod wallpaper;
 mod wayland;
 
 fn main() {

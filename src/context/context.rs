@@ -416,6 +416,48 @@ impl Context {
         Ok(())
     }
 
+    /// 运行时重新加载纹理（方案 A：基础切换）
+    /// 步骤：
+    /// 1. 等待设备空闲
+    /// 2. 销毁旧纹理资源
+    /// 3. 读取新图片
+    /// 4. 创建新纹理资源
+    /// 5. 更新描述符集
+    pub fn reload_texture(&mut self, new_path: &std::path::Path) -> Result<()> {
+        // 1. 等待 GPU 完成当前工作
+        unsafe { self.device.device_wait_idle()? };
+
+        // 2. 销毁旧纹理资源
+        unsafe {
+            self.device
+                .destroy_image_view(self.data.texture_image_view, None);
+            self.device.destroy_image(self.data.texture_image, None);
+            self.device
+                .free_memory(self.data.texture_image_memory, None);
+            self.device
+                .destroy_sampler(self.data.texture_image_sampler, None);
+        }
+
+        // 3. 读取新图片
+        let new_image = texture::read_image(new_path.to_str().unwrap())?;
+
+        // 4. 创建新纹理资源
+        texture::create_texture_image(&self.instance, &self.device, &mut self.data, &new_image)?;
+        texture::create_texture_image_view(&self.device, &mut self.data)?;
+        texture::create_texture_sampler(&self.device, &mut self.data)?;
+
+        // 5. 更新描述符集
+        self.data.descriptor_manager.update(
+            &self.device,
+            &self.data.uniform_buffers,
+            self.data.texture_image_view,
+            self.data.texture_image_sampler,
+        );
+
+        self.image = new_image;
+        Ok(())
+    }
+
     pub fn destroy(&mut self) {
         unsafe {
             self.device.device_wait_idle().unwrap();
