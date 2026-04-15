@@ -57,7 +57,6 @@ pub struct Context {
     frame: usize,
 
     start: Instant,
-    image: DynamicImage,
 }
 
 #[derive(Default)]
@@ -93,6 +92,9 @@ pub struct ContextData {
     pub(crate) color_image_memory: vk::DeviceMemory,
     pub(crate) color_image_view: vk::ImageView,
     pub(crate) msaa_samples: vk::SampleCountFlags,
+
+    // Cached memory type index for host-visible memory (used by reload_texture)
+    pub(crate) host_visible_memory_type: Option<u32>,
 }
 
 impl Context {
@@ -135,7 +137,7 @@ impl Context {
 
         // Create pipeline
         let vert_shader = include_bytes!("../../shader/vert.spv");
-        let frag_shader = include_bytes!("../../shader/frag1.spv");
+        let frag_shader = include_bytes!("../../shader/frag.spv");
         data.pipeline = Pipeline::create(
             &device,
             data.swapchain.format,
@@ -189,7 +191,6 @@ impl Context {
             device,
             frame: 0,
             start: Instant::now(),
-            image,
         })
     }
 
@@ -274,7 +275,6 @@ impl Context {
             device,
             frame: 0,
             start: Instant::now(),
-            image,
         })
     }
 
@@ -438,6 +438,10 @@ impl Context {
                 .destroy_sampler(self.data.texture_image_sampler, None);
         }
 
+        // 等待驱动清理资源（避免内存碎片导致后续分配失败）
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        unsafe { self.device.device_wait_idle()? };
+
         // 3. 读取新图片
         let new_image = texture::read_image(new_path.to_str().unwrap())?;
 
@@ -454,7 +458,6 @@ impl Context {
             self.data.texture_image_sampler,
         );
 
-        self.image = new_image;
         Ok(())
     }
 

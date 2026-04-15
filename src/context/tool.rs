@@ -20,16 +20,35 @@ pub fn get_memory_type_index(
     properties: vk::MemoryPropertyFlags,
     requirements: vk::MemoryRequirements,
 ) -> Result<u32> {
-    let memroy = unsafe {
+    // Workaround: 对于 HOST_VISIBLE | HOST_COHERENT，使用缓存的 memory type
+    let is_host_visible = properties.contains(vk::MemoryPropertyFlags::HOST_VISIBLE)
+        && properties.contains(vk::MemoryPropertyFlags::HOST_COHERENT);
+
+    if is_host_visible {
+        if let Some(cached) = data.host_visible_memory_type {
+            // 验证这个 memory type 是否支持当前 requirements
+            if (requirements.memory_type_bits & (1 << cached)) != 0 {
+                return Ok(cached);
+            }
+        }
+    }
+
+    let memory = unsafe {
         instance.get_physical_device_memory_properties(data.device_manager.physical_device)
     };
-    (0..memroy.memory_type_count)
+
+    let result = (0..memory.memory_type_count)
         .find(|i| {
             let suitable = (requirements.memory_type_bits & (1 << i)) != 0;
-            let memory_type = memroy.memory_types[*i as usize];
+            if !suitable {
+                return false;
+            }
+            let memory_type = memory.memory_types[*i as usize];
             suitable && memory_type.property_flags.contains(properties)
         })
-        .ok_or_else(|| anyhow!("get memory type error"))
+        .ok_or_else(|| anyhow!("get memory type error"));
+
+    result
 }
 
 ///
@@ -52,18 +71,22 @@ pub fn create_buffer(
 
     let requirements = unsafe { device.get_buffer_memory_requirements(buffer) };
 
+    let memory_type_index = get_memory_type_index(instance, data, properties, requirements)?;
+
+    // 缓存 host-visible memory type 供后续使用（如 reload_texture）
+    let is_host_visible = properties.contains(vk::MemoryPropertyFlags::HOST_VISIBLE)
+        && properties.contains(vk::MemoryPropertyFlags::HOST_COHERENT);
+    if is_host_visible && data.host_visible_memory_type.is_none() {
+        data.host_visible_memory_type = Some(memory_type_index);
+    }
+
     let memory_info = vk::MemoryAllocateInfo::builder()
         .allocation_size(requirements.size)
-        .memory_type_index(get_memory_type_index(
-            instance,
-            data,
-            properties,
-            requirements,
-        )?);
+        .memory_type_index(memory_type_index);
 
     let buffer_memory = unsafe { device.allocate_memory(&memory_info, None)? };
 
-    unsafe { device.bind_buffer_memory(buffer, buffer_memory, 0)? }
+    unsafe { device.bind_buffer_memory(buffer, buffer_memory, 0)? };
 
     Ok((buffer, buffer_memory))
 }
@@ -101,14 +124,15 @@ pub fn create_image(
 
     let requirements = unsafe { device.get_image_memory_requirements(texture_image) };
 
+    let memory_type_index = get_memory_type_index(instance, data, properties, requirements)
+        .map_err(|e| {
+            eprintln!("[create_image] ERROR in get_memory_type_index: {:?}", e);
+            e
+        })?;
+
     let memory_info = vk::MemoryAllocateInfo::builder()
         .allocation_size(requirements.size)
-        .memory_type_index(get_memory_type_index(
-            instance,
-            data,
-            properties,
-            requirements,
-        )?);
+        .memory_type_index(memory_type_index);
 
     let texture_image_memory = unsafe { device.allocate_memory(&memory_info, None)? };
 

@@ -1,8 +1,11 @@
 use std::os::raw::c_void;
 
+use std::path::{Path, PathBuf};
+
 use wayland_client::{Connection, Proxy};
 
 use context::Context;
+use wallpaper::Manager;
 use wayland::State;
 
 mod app;
@@ -33,6 +36,10 @@ fn main() {
         output_scale: 1,
     };
 
+    let directory = Path::new("assets/wallpapers/");
+
+    let mut manager = Manager::new(directory, 10).unwrap();
+
     while state.running {
         event_queue.blocking_dispatch(&mut state).unwrap();
 
@@ -54,6 +61,11 @@ fn main() {
 
         if state.configured && state.render {
             if let Some(context) = state.context.as_mut() {
+                if let Some(path) = manager.update() {
+                    if let Err(err) = context.reload_texture(path) {
+                        println!("{0}", err);
+                    }
+                }
                 context.render_wayland().unwrap();
             }
             if let Some(surface) = state.base_surface.as_ref() {

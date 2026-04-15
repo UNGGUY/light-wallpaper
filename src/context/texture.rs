@@ -33,7 +33,8 @@ pub fn create_texture_image(
 
     let (width, height) = image_rgba.dimensions();
 
-    data.mip_levels = (width.max(height) as f32).log2().floor() as u32 + 1;
+    // data.mip_levels = (width.max(height) as f32).log2().floor() as u32 + 1;
+    data.mip_levels = 1;
 
     let pixels = image_rgba.as_raw();
 
