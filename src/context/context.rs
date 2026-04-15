@@ -18,6 +18,7 @@ use crate::context::Vertex;
 use crate::context::command::CommandManager;
 use crate::context::instance;
 use crate::context::msaa;
+use crate::context::swapchain;
 use crate::context::texture;
 use crate::context::tool;
 use crate::context::uniform;
