@@ -16,6 +16,7 @@ use crate::context::SyncObjects;
 use crate::context::UniformBufferObject;
 use crate::context::Vertex;
 use crate::context::command::CommandManager;
+use crate::context::frame;
 use crate::context::instance;
 use crate::context::msaa;
 use crate::context::swapchain;
@@ -156,7 +157,7 @@ impl Context {
         msaa::create_color_objects(&instance, &device, &mut data)?;
 
         // Create frame buffers
-        create_frame_buffers(&device, &mut data)?;
+        frame::create_frame_buffers(&device, &mut data)?;
 
         // Create texture
         texture::create_texture_image(&instance, &device, &mut data, &image)?;
@@ -182,7 +183,7 @@ impl Context {
         data.sync_objects = SyncObjects::create(&device, data.swapchain.images.len())?;
 
         // Record command buffers
-        record_command_buffers(&device, &mut data)?;
+        CommandManager::record_command_buffers(&device, &mut data)?;
 
         Ok(Self {
             instance,
@@ -241,7 +242,7 @@ impl Context {
             .allocate_buffers(&device, data.swapchain.images.len() as u32)?;
 
         // Create frame buffers
-        create_frame_buffers(&device, &mut data)?;
+        frame::create_frame_buffers(&device, &mut data)?;
 
         // Create texture
         texture::create_texture_image(&instance, &device, &mut data, &image)?;
@@ -267,7 +268,7 @@ impl Context {
         data.sync_objects = SyncObjects::create(&device, data.swapchain.images.len())?;
 
         // Record command buffers
-        record_command_buffers(&device, &mut data)?;
+        CommandManager::record_command_buffers(&device, &mut data)?;
 
         Ok(Self {
             instance,
@@ -511,82 +512,5 @@ fn create_surface(
         .display(display);
 
     data.surface = unsafe { instance.create_wayland_surface_khr(&info, None)? };
-    Ok(())
-}
-
-fn create_frame_buffers(device: &Device, data: &mut ContextData) -> Result<()> {
-    data.frame_buffers = data
-        .swapchain
-        .image_views
-        .iter()
-        .map(|image_view| {
-            let attachments = if data.msaa_samples != vk::SampleCountFlags::_1 {
-                vec![data.color_image_view, *image_view]
-            } else {
-                vec![*image_view]
-            };
-
-            let info = vk::FramebufferCreateInfo::builder()
-                .render_pass(data.pipeline.render_pass)
-                .attachments(&attachments)
-                .width(data.swapchain.extent.width)
-                .height(data.swapchain.extent.height)
-                .layers(1);
-
-            unsafe { device.create_framebuffer(&info, None).unwrap() }
-        })
-        .collect::<Vec<_>>();
-    Ok(())
-}
-
-fn record_command_buffers(device: &Device, data: &mut ContextData) -> Result<()> {
-    for (i, command_buffer) in data.command_manager.buffers.iter().enumerate() {
-        let info = vk::CommandBufferBeginInfo::builder();
-        unsafe { device.begin_command_buffer(*command_buffer, &info)? };
-
-        let render_area = vk::Rect2D::builder()
-            .offset(vk::Offset2D::default())
-            .extent(data.swapchain.extent);
-
-        let color_clear_value = vk::ClearValue {
-            color: vk::ClearColorValue {
-                float32: [0.0, 0.0, 0.0, 1.0],
-            },
-        };
-
-        let clear_values = &[color_clear_value];
-        let info = vk::RenderPassBeginInfo::builder()
-            .render_pass(data.pipeline.render_pass)
-            .framebuffer(data.frame_buffers[i])
-            .render_area(render_area)
-            .clear_values(clear_values);
-
-        unsafe {
-            device.cmd_begin_render_pass(*command_buffer, &info, vk::SubpassContents::INLINE);
-            device.cmd_bind_pipeline(
-                *command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                data.pipeline.pipeline,
-            );
-            device.cmd_bind_vertex_buffers(*command_buffer, 0, &[data.vertex_buffer], &[0]);
-            device.cmd_bind_index_buffer(
-                *command_buffer,
-                data.index_buffer,
-                0,
-                vk::IndexType::UINT16,
-            );
-            device.cmd_bind_descriptor_sets(
-                *command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                data.pipeline.layout,
-                0,
-                &[data.descriptor_manager.sets[i]],
-                &[],
-            );
-            device.cmd_draw_indexed(*command_buffer, vertex::INDICES.len() as u32, 1, 0, 0, 0);
-            device.cmd_end_render_pass(*command_buffer);
-            device.end_command_buffer(*command_buffer)?;
-        }
-    }
     Ok(())
 }

@@ -3,6 +3,7 @@ pub mod command;
 pub mod context;
 pub mod descriptor;
 pub mod device;
+pub mod frame;
 pub mod instance;
 pub mod mipmap;
 pub mod msaa;
