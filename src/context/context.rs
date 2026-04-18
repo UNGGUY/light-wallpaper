@@ -1,6 +1,7 @@
 #![allow(unused)]
 use std::collections::HashSet;
 use std::ffi::c_void;
+use std::mem::ManuallyDrop;
 use std::ptr::copy_nonoverlapping as memcpy;
 use std::time::Instant;
 
@@ -89,6 +90,12 @@ pub struct ContextData {
     pub(crate) texture_image_sampler: vk::Sampler,
     pub(crate) mip_levels: u32,
 
+    // Double buffering for wallpaper switching (Intel GPU workaround)
+    pub(crate) texture_image_alt: vk::Image,
+    pub(crate) texture_image_alt_memory: vk::DeviceMemory,
+    pub(crate) texture_image_alt_view: vk::ImageView,
+    pub(crate) use_alt_texture: bool,
+
     // Msaa
     pub(crate) color_image: vk::Image,
     pub(crate) color_image_memory: vk::DeviceMemory,
@@ -97,6 +104,9 @@ pub struct ContextData {
 
     // Cached memory type index for host-visible memory (used by reload_texture)
     pub(crate) host_visible_memory_type: Option<u32>,
+
+    // Dedicated command buffer for texture uploads (Intel GPU workaround)
+    pub(crate) upload_command_buffer: vk::CommandBuffer,
 }
 
 impl Context {
@@ -156,15 +166,29 @@ impl Context {
             .allocate_buffers(&device, data.swapchain.images.len() as u32)?;
 
         // Create MSAA color objects (if needed)
-        msaa::create_color_objects(&instance, &device, &mut data)?;
+        //msaa::create_color_objects(&instance, &device, &mut data)?;
 
         // Create frame buffers
         frame::create_frame_buffers(&device, &mut data)?;
 
-        // Create texture
+        // Create texture (double buffering for Intel GPU workaround)
         texture::create_texture_image(&instance, &device, &mut data, &image)?;
         texture::create_texture_image_view(&device, &mut data)?;
         texture::create_texture_sampler(&device, &mut data)?;
+
+        // Create alternate texture for wallpaper switching
+        texture::create_alt_texture_image(&instance, &device, &mut data, &image)?;
+        texture::create_alt_texture_image_view(&device, &mut data)?;
+        data.use_alt_texture = false;
+
+        // Allocate dedicated command buffer for texture uploads (Intel GPU workaround)
+        let upload_cmd_alloc_info = vk::CommandBufferAllocateInfo::builder()
+            .level(vk::CommandBufferLevel::PRIMARY)
+            .command_pool(data.command_manager.pool)
+            .command_buffer_count(1);
+        data.upload_command_buffer = unsafe {
+            device.allocate_command_buffers(&upload_cmd_alloc_info)?[0]
+        };
 
         // Create vertex and index buffers
         vertex::create_vertex_buffer(&instance, &device, &mut data)?;
@@ -245,10 +269,24 @@ impl Context {
         // Create frame buffers
         frame::create_frame_buffers(&device, &mut data)?;
 
-        // Create texture
+        // Create texture (double buffering for Intel GPU workaround)
         texture::create_texture_image(&instance, &device, &mut data, &image)?;
         texture::create_texture_image_view(&device, &mut data)?;
         texture::create_texture_sampler(&device, &mut data)?;
+
+        // Create alternate texture for wallpaper switching
+        texture::create_alt_texture_image(&instance, &device, &mut data, &image)?;
+        texture::create_alt_texture_image_view(&device, &mut data)?;
+        data.use_alt_texture = false;
+
+        // Allocate dedicated command buffer for texture uploads (Intel GPU workaround)
+        let upload_cmd_alloc_info = vk::CommandBufferAllocateInfo::builder()
+            .level(vk::CommandBufferLevel::PRIMARY)
+            .command_pool(data.command_manager.pool)
+            .command_buffer_count(1);
+        data.upload_command_buffer = unsafe {
+            device.allocate_command_buffers(&upload_cmd_alloc_info)?[0]
+        };
 
         // Create vertex and index buffers
         vertex::create_vertex_buffer(&instance, &device, &mut data)?;
@@ -418,47 +456,65 @@ impl Context {
         Ok(())
     }
 
-    /// 运行时重新加载纹理（方案 A：基础切换）
-    /// 步骤：
-    /// 1. 等待设备空闲
-    /// 2. 销毁旧纹理资源
-    /// 3. 读取新图片
-    /// 4. 创建新纹理资源
-    /// 5. 更新描述符集
+    /// 运行时重新加载纹理（双缓冲方案 - Intel GPU workaround）
     pub fn reload_texture(&mut self, new_path: &std::path::Path) -> Result<()> {
-        // 1. 等待 GPU 完成当前工作
+        // 1. 等待 GPU 完全空闲
         unsafe { self.device.device_wait_idle()? };
 
-        // 2. 销毁旧纹理资源
-        unsafe {
-            self.device
-                .destroy_image_view(self.data.texture_image_view, None);
-            self.device.destroy_image(self.data.texture_image, None);
-            self.device
-                .free_memory(self.data.texture_image_memory, None);
-            self.device
-                .destroy_sampler(self.data.texture_image_sampler, None);
-        }
-
-        // 等待驱动清理资源（避免内存碎片导致后续分配失败）
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        unsafe { self.device.device_wait_idle()? };
-
-        // 3. 读取新图片
+        // 2. 读取新图片
         let new_image = texture::read_image(new_path.to_str().unwrap())?;
 
-        // 4. 创建新纹理资源
-        texture::create_texture_image(&self.instance, &self.device, &mut self.data, &new_image)?;
-        texture::create_texture_image_view(&self.device, &mut self.data)?;
-        texture::create_texture_sampler(&self.device, &mut self.data)?;
+        // 3. 确定目标纹理
+        let target_image = if self.data.use_alt_texture {
+            self.data.texture_image
+        } else {
+            self.data.texture_image_alt
+        };
 
-        // 5. 更新描述符集
-        self.data.descriptor_manager.update(
+        // 4. 上传数据
+        texture::upload_to_texture(
+            &self.instance,
             &self.device,
-            &self.data.uniform_buffers,
-            self.data.texture_image_view,
-            self.data.texture_image_sampler,
-        );
+            &mut self.data,
+            &new_image,
+            target_image,
+        )?;
+
+        // 5. 再次等待上传完成
+        unsafe { self.device.device_wait_idle()? };
+
+        // 6. 切换纹理标志
+        self.data.use_alt_texture = !self.data.use_alt_texture;
+
+        // 7. 选择新的纹理视图
+        let image_view = if self.data.use_alt_texture {
+            eprintln!("[reload_texture] Using alt view: {:?}", self.data.texture_image_alt_view);
+            self.data.texture_image_alt_view
+        } else {
+            eprintln!("[reload_texture] Using main view: {:?}", self.data.texture_image_view);
+            self.data.texture_image_view
+        };
+
+        // 8. 逐个更新描述符集（避免生命周期问题）
+        for set in &self.data.descriptor_manager.sets {
+            let image_info = vk::DescriptorImageInfo::builder()
+                .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                .image_view(image_view)
+                .sampler(self.data.texture_image_sampler)
+                .build();
+
+            let write = vk::WriteDescriptorSet::builder()
+                .dst_set(*set)
+                .dst_binding(1)
+                .dst_array_element(0)
+                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .image_info(std::slice::from_ref(&image_info))
+                .build();
+
+            unsafe {
+                self.device.update_descriptor_sets(&[write], &[] as &[vk::CopyDescriptorSet]);
+            }
+        }
 
         Ok(())
     }
@@ -494,13 +550,34 @@ impl Context {
                 self.device.free_memory(*memory, None);
             }
 
-            self.device
-                .destroy_image_view(self.data.texture_image_view, None);
-            self.device.destroy_image(self.data.texture_image, None);
-            self.device
-                .free_memory(self.data.texture_image_memory, None);
-            self.device
-                .destroy_sampler(self.data.texture_image_sampler, None);
+            // 清理主纹理
+            if !self.data.texture_image_view.is_null() {
+                self.device
+                    .destroy_image_view(self.data.texture_image_view, None);
+            }
+            if !self.data.texture_image.is_null() {
+                self.device.destroy_image(self.data.texture_image, None);
+            }
+            if !self.data.texture_image_memory.is_null() {
+                self.device
+                    .free_memory(self.data.texture_image_memory, None);
+            }
+            // 清理备用纹理
+            if !self.data.texture_image_alt_view.is_null() {
+                self.device
+                    .destroy_image_view(self.data.texture_image_alt_view, None);
+            }
+            if !self.data.texture_image_alt.is_null() {
+                self.device.destroy_image(self.data.texture_image_alt, None);
+            }
+            if !self.data.texture_image_alt_memory.is_null() {
+                self.device
+                    .free_memory(self.data.texture_image_alt_memory, None);
+            }
+            if !self.data.texture_image_sampler.is_null() {
+                self.device
+                    .destroy_sampler(self.data.texture_image_sampler, None);
+            }
 
             if self.data.msaa_samples != vk::SampleCountFlags::_1 {
                 self.device

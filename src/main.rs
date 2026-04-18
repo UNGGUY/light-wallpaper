@@ -57,11 +57,14 @@ fn main() {
                 )
                 .unwrap(),
             );
+
+            println!("create context");
         }
 
         if state.configured && state.render {
             if let Some(context) = state.context.as_mut() {
                 if let Some(path) = manager.update() {
+                    println!("update");
                     if let Err(err) = context.reload_texture(path) {
                         println!("{0}", err);
                     }

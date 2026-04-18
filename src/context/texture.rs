@@ -33,6 +33,8 @@ pub fn create_texture_image(
 
     let (width, height) = image_rgba.dimensions();
 
+    println!("{0}{1}", width, height);
+
     // data.mip_levels = (width.max(height) as f32).log2().floor() as u32 + 1;
     data.mip_levels = 1;
 
@@ -251,5 +253,221 @@ pub fn create_texture_sampler(device: &Device, data: &mut ContextData) -> Result
         .mip_lod_bias(0.0);
 
     data.texture_image_sampler = unsafe { device.create_sampler(&info, None)? };
+    Ok(())
+}
+
+///
+/// Create Alternate Texture Image (for double buffering)
+///
+pub fn create_alt_texture_image(
+    instance: &Instance,
+    device: &Device,
+    data: &mut ContextData,
+    image: &DynamicImage,
+) -> Result<()> {
+    let image_rgba = image.to_rgba8();
+    let (width, height) = image_rgba.dimensions();
+
+    eprintln!("[create_alt_texture_image] Creating alt image {}x{}...", width, height);
+    let (texture_image, texture_image_memory) = tool::create_image(
+        instance,
+        device,
+        data,
+        width,
+        height,
+        1, // mip_levels = 1 for alt texture
+        vk::Format::R8G8B8A8_SRGB,
+        vk::ImageTiling::OPTIMAL,
+        vk::SampleCountFlags::_1,
+        vk::ImageUsageFlags::SAMPLED
+            | vk::ImageUsageFlags::TRANSFER_DST
+            | vk::ImageUsageFlags::TRANSFER_SRC,
+        vk::MemoryPropertyFlags::DEVICE_LOCAL,
+    )?;
+    eprintln!("[create_alt_texture_image] Alt image created: {:?}, memory: {:?}", texture_image, texture_image_memory);
+
+    data.texture_image_alt = texture_image;
+    data.texture_image_alt_memory = texture_image_memory;
+
+    Ok(())
+}
+
+///
+/// Create Alternate Texture ImageView
+///
+pub fn create_alt_texture_image_view(device: &Device, data: &mut ContextData) -> Result<()> {
+    eprintln!("[create_alt_texture_image_view] Creating view for image {:?}...", data.texture_image_alt);
+    data.texture_image_alt_view = tool::create_image_view(
+        device,
+        data.texture_image_alt,
+        vk::Format::R8G8B8A8_SRGB,
+        1, // mip_levels = 1
+    )?;
+    eprintln!("[create_alt_texture_image_view] Alt view created: {:?}", data.texture_image_alt_view);
+    Ok(())
+}
+
+///
+/// Upload image data to an existing texture (for double buffering)
+///
+/// Upload image data to an existing texture using pre-recorded command buffer
+/// Avoids creating new command buffers (Intel GPU workaround)
+pub fn upload_to_texture(
+    _instance: &Instance,
+    device: &Device,
+    data: &mut ContextData,
+    image: &DynamicImage,
+    target_image: vk::Image,
+) -> Result<()> {
+    eprintln!("[upload_to_texture] Starting upload to image {:?}...", target_image);
+
+    let image_rgba = image.to_rgba8();
+    let (width, height) = image_rgba.dimensions();
+    let pixels = image_rgba.as_raw();
+    let size = pixels.len() as u64;
+
+    eprintln!("[upload_to_texture] Image size: {}x{}, data size: {} bytes", width, height, size);
+
+    // Use cached host-visible memory type if available
+    let (staging_buffer, staging_buffer_memory) = if let Some(mem_type) = data.host_visible_memory_type {
+        eprintln!("[upload_to_texture] Using cached memory type {} for staging buffer", mem_type);
+        // Create buffer with cached memory type directly
+        let buffer_info = vk::BufferCreateInfo::builder()
+            .size(size)
+            .usage(vk::BufferUsageFlags::TRANSFER_SRC)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE);
+        let buffer = unsafe { device.create_buffer(&buffer_info, None)? };
+        let requirements = unsafe { device.get_buffer_memory_requirements(buffer) };
+
+        let memory_info = vk::MemoryAllocateInfo::builder()
+            .allocation_size(requirements.size)
+            .memory_type_index(mem_type);
+        let memory = unsafe { device.allocate_memory(&memory_info, None)? };
+        unsafe { device.bind_buffer_memory(buffer, memory, 0)? };
+        (buffer, memory)
+    } else {
+        tool::create_buffer(
+            _instance,
+            device,
+            data,
+            size,
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
+        )?
+    };
+    eprintln!("[upload_to_texture] Staging buffer created");
+
+    // Copy data to staging buffer
+    let memory = unsafe {
+        device.map_memory(staging_buffer_memory, 0, size, vk::MemoryMapFlags::empty())?
+    };
+    unsafe {
+        memcpy(pixels.as_ptr(), memory.cast(), pixels.len());
+        device.unmap_memory(staging_buffer_memory);
+    }
+    eprintln!("[upload_to_texture] Data copied to staging buffer");
+
+    // Use the dedicated upload command buffer (pre-allocated, Intel GPU workaround)
+    let command_buffer = data.upload_command_buffer;
+
+    eprintln!("[upload_to_texture] Resetting upload CB...");
+    unsafe {
+        device.reset_command_buffer(command_buffer, vk::CommandBufferResetFlags::RELEASE_RESOURCES)?;
+        let begin_info = vk::CommandBufferBeginInfo::builder()
+            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        device.begin_command_buffer(command_buffer, &begin_info)?;
+    }
+
+    eprintln!("[upload_to_texture] Recording commands to upload CB...");
+    unsafe {
+
+        // Transition layout UNDEFINED -> TRANSFER_DST
+        let subresource_range = vk::ImageSubresourceRange::builder()
+            .aspect_mask(vk::ImageAspectFlags::COLOR)
+            .base_mip_level(0)
+            .level_count(1)
+            .base_array_layer(0)
+            .layer_count(1);
+        let barrier1 = vk::ImageMemoryBarrier::builder()
+            .old_layout(vk::ImageLayout::UNDEFINED)
+            .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .image(target_image)
+            .subresource_range(subresource_range)
+            .src_access_mask(vk::AccessFlags::empty())
+            .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE);
+        device.cmd_pipeline_barrier(
+            command_buffer,
+            vk::PipelineStageFlags::TOP_OF_PIPE,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::DependencyFlags::empty(),
+            &[] as &[vk::MemoryBarrier],
+            &[] as &[vk::BufferMemoryBarrier],
+            &[barrier1],
+        );
+
+        // Copy buffer to image
+        let image_subresource = vk::ImageSubresourceLayers::builder()
+            .aspect_mask(vk::ImageAspectFlags::COLOR)
+            .mip_level(0)
+            .base_array_layer(0)
+            .layer_count(1);
+        let region = vk::BufferImageCopy::builder()
+            .buffer_offset(0)
+            .buffer_row_length(0)
+            .buffer_image_height(0)
+            .image_subresource(image_subresource)
+            .image_offset(vk::Offset3D { x: 0, y: 0, z: 0 })
+            .image_extent(vk::Extent3D { width, height, depth: 1 });
+        device.cmd_copy_buffer_to_image(
+            command_buffer,
+            staging_buffer,
+            target_image,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            &[region],
+        );
+
+        // Transition layout TRANSFER_DST -> SHADER_READ
+        let barrier2 = vk::ImageMemoryBarrier::builder()
+            .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+            .new_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .image(target_image)
+            .subresource_range(subresource_range)
+            .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+            .dst_access_mask(vk::AccessFlags::SHADER_READ);
+        device.cmd_pipeline_barrier(
+            command_buffer,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::PipelineStageFlags::FRAGMENT_SHADER,
+            vk::DependencyFlags::empty(),
+            &[] as &[vk::MemoryBarrier],
+            &[] as &[vk::BufferMemoryBarrier],
+            &[barrier2],
+        );
+
+        device.end_command_buffer(command_buffer)?;
+    }
+    eprintln!("[upload_to_texture] Commands recorded");
+
+    // Submit and wait
+    eprintln!("[upload_to_texture] Submitting commands...");
+    let command_buffers = &[command_buffer];
+    let submit_info = vk::SubmitInfo::builder().command_buffers(command_buffers);
+    unsafe {
+        device.queue_submit(data.device_queue.graphics_queue, &[submit_info], vk::Fence::default())?;
+        device.queue_wait_idle(data.device_queue.graphics_queue)?;
+    }
+    eprintln!("[upload_to_texture] Commands executed");
+
+    // Cleanup
+    unsafe {
+        device.destroy_buffer(staging_buffer, None);
+        device.free_memory(staging_buffer_memory, None);
+    }
+    eprintln!("[upload_to_texture] Done!");
+
     Ok(())
 }

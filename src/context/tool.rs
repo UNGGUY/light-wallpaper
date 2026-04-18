@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use crate::context::ContextData;
 use anyhow::{Result, anyhow};
 use vulkanalia::Device;
@@ -120,7 +122,17 @@ pub fn create_image(
         .sharing_mode(vk::SharingMode::EXCLUSIVE)
         .samples(samples)
         .flags(vk::ImageCreateFlags::empty());
-    let texture_image = unsafe { device.create_image(&image_info, None)? };
+
+    println!("device:{:?}", device);
+
+    let texture_image = match unsafe { device.create_image(&image_info, None) } {
+        Ok(image) => image,
+        Err(e) => {
+            eprintln!("Failed to create image: {}", e);
+            return Err(anyhow!(e));
+        }
+    };
+    println!("create image success");
 
     let requirements = unsafe { device.get_image_memory_requirements(texture_image) };
 
