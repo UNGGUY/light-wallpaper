@@ -321,12 +321,30 @@ pub fn upload_to_texture(
 ) -> Result<()> {
     eprintln!("[upload_to_texture] Starting upload to image {:?}...", target_image);
 
+    // Resize image to match texture size
     let image_rgba = image.to_rgba8();
+    let (orig_width, orig_height) = image_rgba.dimensions();
+    let target_width = data.texture_width;
+    let target_height = data.texture_height;
+
+    let image_rgba = if orig_width != target_width || orig_height != target_height {
+        eprintln!("[upload_to_texture] Resizing image from {}x{} to {}x{}",
+                  orig_width, orig_height, target_width, target_height);
+        image::imageops::resize(
+            &image_rgba,
+            target_width,
+            target_height,
+            image::imageops::FilterType::Lanczos3,
+        )
+    } else {
+        image_rgba
+    };
+
     let (width, height) = image_rgba.dimensions();
     let pixels = image_rgba.as_raw();
     let size = pixels.len() as u64;
 
-    eprintln!("[upload_to_texture] Image size: {}x{}, data size: {} bytes", width, height, size);
+    eprintln!("[upload_to_texture] Final image size: {}x{}, data size: {} bytes", width, height, size);
 
     // Use cached host-visible memory type if available
     let (staging_buffer, staging_buffer_memory) = if let Some(mem_type) = data.host_visible_memory_type {

@@ -95,6 +95,8 @@ pub struct ContextData {
     pub(crate) texture_image_alt_memory: vk::DeviceMemory,
     pub(crate) texture_image_alt_view: vk::ImageView,
     pub(crate) use_alt_texture: bool,
+    pub(crate) texture_width: u32,
+    pub(crate) texture_height: u32,
 
     // Msaa
     pub(crate) color_image: vk::Image,
@@ -180,6 +182,10 @@ impl Context {
         texture::create_alt_texture_image(&instance, &device, &mut data, &image)?;
         texture::create_alt_texture_image_view(&device, &mut data)?;
         data.use_alt_texture = false;
+
+        // Store texture dimensions for resizing during wallpaper switch
+        data.texture_width = image.width();
+        data.texture_height = image.height();
 
         // Allocate dedicated command buffer for texture uploads (Intel GPU workaround)
         let upload_cmd_alloc_info = vk::CommandBufferAllocateInfo::builder()
@@ -278,6 +284,10 @@ impl Context {
         texture::create_alt_texture_image(&instance, &device, &mut data, &image)?;
         texture::create_alt_texture_image_view(&device, &mut data)?;
         data.use_alt_texture = false;
+
+        // Store texture dimensions for resizing during wallpaper switch
+        data.texture_width = image.width();
+        data.texture_height = image.height();
 
         // Allocate dedicated command buffer for texture uploads (Intel GPU workaround)
         let upload_cmd_alloc_info = vk::CommandBufferAllocateInfo::builder()
