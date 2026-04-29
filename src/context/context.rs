@@ -16,7 +16,7 @@ use crate::context::Swapchain;
 use crate::context::SyncObjects;
 use crate::context::UniformBufferObject;
 use crate::context::Vertex;
-use crate::context::command::CommandManager;
+use crate::context::command::{self, CommandManager};
 use crate::context::frame;
 use crate::context::instance;
 use crate::context::msaa;
@@ -532,6 +532,9 @@ impl Context {
                     .update_descriptor_sets(&[write], &[] as &[vk::CopyDescriptorSet]);
             }
         }
+
+        // 9. 重新记录 command buffers（descriptor set 已更新，必须重新记录）
+        CommandManager::record_command_buffers(&self.device, &mut self.data)?;
 
         Ok(())
     }

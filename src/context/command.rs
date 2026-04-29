@@ -107,7 +107,7 @@ fn create_command_pool(
         QueueFamilyindices::get(instance, data.device_manager.physical_device, data.surface)?;
 
     let info = vk::CommandPoolCreateInfo::builder()
-        .flags(vk::CommandPoolCreateFlags::empty())
+        .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
         .queue_family_index(indices.graphics);
 
     let pool = unsafe { device.create_command_pool(&info, None)? };
