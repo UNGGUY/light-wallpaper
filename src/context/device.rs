@@ -37,6 +37,16 @@ impl DeviceManager {
             // 3. 尝试检查当前设备
             match Self::check_physical_device(instance, physical_device, surface) {
                 Ok(indices) => {
+                    // 获取物理设备的属性
+                    let properties =
+                        unsafe { instance.get_physical_device_properties(physical_device) };
+
+                    // 从属性中获取设备名称
+                    // device_name 是一个 CStr，我们将其转换为 Rust 的 &str
+                    let device_name = properties.device_name.to_string_lossy();
+
+                    println!("Found suitable physical device: {}", device_name);
+
                     // 找到了合适的设备，直接返回构造好的结构体
                     return Ok(Self {
                         physical_device,

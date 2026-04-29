@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::context::ContextData;
 use crate::context::tool;
 

@@ -192,9 +192,8 @@ impl Context {
             .level(vk::CommandBufferLevel::PRIMARY)
             .command_pool(data.command_manager.pool)
             .command_buffer_count(1);
-        data.upload_command_buffer = unsafe {
-            device.allocate_command_buffers(&upload_cmd_alloc_info)?[0]
-        };
+        data.upload_command_buffer =
+            unsafe { device.allocate_command_buffers(&upload_cmd_alloc_info)?[0] };
 
         // Create vertex and index buffers
         vertex::create_vertex_buffer(&instance, &device, &mut data)?;
@@ -294,9 +293,8 @@ impl Context {
             .level(vk::CommandBufferLevel::PRIMARY)
             .command_pool(data.command_manager.pool)
             .command_buffer_count(1);
-        data.upload_command_buffer = unsafe {
-            device.allocate_command_buffers(&upload_cmd_alloc_info)?[0]
-        };
+        data.upload_command_buffer =
+            unsafe { device.allocate_command_buffers(&upload_cmd_alloc_info)?[0] };
 
         // Create vertex and index buffers
         vertex::create_vertex_buffer(&instance, &device, &mut data)?;
@@ -498,10 +496,16 @@ impl Context {
 
         // 7. 选择新的纹理视图
         let image_view = if self.data.use_alt_texture {
-            eprintln!("[reload_texture] Using alt view: {:?}", self.data.texture_image_alt_view);
+            eprintln!(
+                "[reload_texture] Using alt view: {:?}",
+                self.data.texture_image_alt_view
+            );
             self.data.texture_image_alt_view
         } else {
-            eprintln!("[reload_texture] Using main view: {:?}", self.data.texture_image_view);
+            eprintln!(
+                "[reload_texture] Using main view: {:?}",
+                self.data.texture_image_view
+            );
             self.data.texture_image_view
         };
 
@@ -522,7 +526,8 @@ impl Context {
                 .build();
 
             unsafe {
-                self.device.update_descriptor_sets(&[write], &[] as &[vk::CopyDescriptorSet]);
+                self.device
+                    .update_descriptor_sets(&[write], &[] as &[vk::CopyDescriptorSet]);
             }
         }
 

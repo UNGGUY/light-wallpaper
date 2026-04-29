@@ -1,6 +1,6 @@
 use std::os::raw::c_void;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use wayland_client::{Connection, Proxy};
 
