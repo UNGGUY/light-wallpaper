@@ -38,7 +38,7 @@ fn main() {
 
     let directory = Path::new("assets/wallpapers/");
 
-    let mut manager = Manager::new(directory, 10).unwrap();
+    let mut manager = Manager::new(directory, 5).unwrap();
 
     while state.running {
         event_queue.blocking_dispatch(&mut state).unwrap();
@@ -57,14 +57,11 @@ fn main() {
                 )
                 .unwrap(),
             );
-
-            println!("create context");
         }
 
         if state.configured && state.render {
             if let Some(context) = state.context.as_mut() {
                 if let Some(path) = manager.update() {
-                    println!("update");
                     if let Err(err) = context.reload_texture(path) {
                         println!("{0}", err);
                     }

@@ -509,6 +509,8 @@ impl Context {
             self.data.texture_image_view
         };
 
+        unsafe { self.device.device_wait_idle()? };
+
         // 8. 逐个更新描述符集（避免生命周期问题）
         for set in &self.data.descriptor_manager.sets {
             let image_info = vk::DescriptorImageInfo::builder()

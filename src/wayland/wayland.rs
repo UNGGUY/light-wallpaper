@@ -104,10 +104,10 @@ impl State {
         // 铺满屏幕
         layer_surface.set_anchor(Anchor::Top | Anchor::Bottom | Anchor::Left | Anchor::Right);
         // 大小设为 0，让 compositor 根据 output 原生分辨率发送 configure
-        layer_surface.set_size(0, 0);
+        //layer_surface.set_size(0, 0);
 
         // 临时 hack：强制 2x 过采样，测试 fractional scaling 是否是锯齿来源
-        base_surface.set_buffer_scale(self.output_scale.max(1));
+        //base_surface.set_buffer_scale(self.output_scale.max(1));
 
         // 提交 surface
         base_surface.commit();
@@ -186,7 +186,6 @@ impl Dispatch<ZwlrLayerSurfaceV1, ()> for State {
             state.height = height;
             state.configured = true;
             state.render = true;
-            let surface = state.base_surface.as_ref().unwrap();
         }
     }
 }
@@ -205,7 +204,7 @@ impl Dispatch<wl_output::WlOutput, ()> for State {
 
             if let Some(surface) = state.base_surface.as_ref() {
                 surface.set_buffer_scale(factor);
-                surface.commit();
+                //surface.commit();
             }
         }
     }
