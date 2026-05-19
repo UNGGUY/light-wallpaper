@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use crate::context::ContextData;
 use anyhow::{Result, anyhow};
 use vulkanalia::Device;
@@ -123,8 +121,6 @@ pub fn create_image(
         .samples(samples)
         .flags(vk::ImageCreateFlags::empty());
 
-    println!("device:{:?}", device);
-
     let texture_image = match unsafe { device.create_image(&image_info, None) } {
         Ok(image) => image,
         Err(e) => {
@@ -132,7 +128,6 @@ pub fn create_image(
             return Err(anyhow!(e));
         }
     };
-    println!("create image success");
 
     let requirements = unsafe { device.get_image_memory_requirements(texture_image) };
 

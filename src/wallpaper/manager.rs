@@ -1,3 +1,4 @@
+#![allow(unused)]
 use anyhow::{Context as _, Result};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -65,7 +66,6 @@ impl Manager {
             let path = entry.path();
 
             if path.is_file() && Self::is_supported_image(&path) {
-                println!("{0}", &path.to_str().unwrap());
                 wallpapers.push(path);
             }
         }

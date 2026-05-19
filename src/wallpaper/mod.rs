@@ -1,3 +1,3 @@
 pub mod manager;
 
-pub use manager::{Manager, PlayMode};
+pub use manager::Manager;

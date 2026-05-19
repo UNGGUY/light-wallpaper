@@ -496,16 +496,8 @@ impl Context {
 
         // 7. 选择新的纹理视图
         let image_view = if self.data.use_alt_texture {
-            eprintln!(
-                "[reload_texture] Using alt view: {:?}",
-                self.data.texture_image_alt_view
-            );
             self.data.texture_image_alt_view
         } else {
-            eprintln!(
-                "[reload_texture] Using main view: {:?}",
-                self.data.texture_image_view
-            );
             self.data.texture_image_view
         };
 

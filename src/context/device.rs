@@ -45,8 +45,6 @@ impl DeviceManager {
                     // device_name 是一个 CStr，我们将其转换为 Rust 的 &str
                     let device_name = properties.device_name.to_string_lossy();
 
-                    println!("Found suitable physical device: {}", device_name);
-
                     // 找到了合适的设备，直接返回构造好的结构体
                     return Ok(Self {
                         physical_device,
@@ -131,7 +129,7 @@ pub fn create_logical_device(
         .collect::<Vec<_>>();
 
     //Layer
-    let layer = vec![];
+    //let layer = vec![];
 
     // Feature
     let feature = vk::PhysicalDeviceFeatures::builder()
@@ -148,8 +146,8 @@ pub fn create_logical_device(
     let device_info = vk::DeviceCreateInfo::builder()
         .queue_create_infos(&queue_infos)
         .enabled_extension_names(&extensions)
-        .enabled_features(&feature)
-        .enabled_layer_names(&layer);
+        .enabled_features(&feature);
+    //.enabled_layer_names(&layer);
 
     let device =
         unsafe { instance.create_device(device_manager.physical_device, &device_info, None)? };

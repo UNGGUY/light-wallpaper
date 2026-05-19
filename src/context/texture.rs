@@ -33,8 +33,6 @@ pub fn create_texture_image(
 
     let (width, height) = image_rgba.dimensions();
 
-    println!("{0}{1}", width, height);
-
     // data.mip_levels = (width.max(height) as f32).log2().floor() as u32 + 1;
     data.mip_levels = 1;
 
@@ -268,7 +266,6 @@ pub fn create_alt_texture_image(
     let image_rgba = image.to_rgba8();
     let (width, height) = image_rgba.dimensions();
 
-    eprintln!("[create_alt_texture_image] Creating alt image {}x{}...", width, height);
     let (texture_image, texture_image_memory) = tool::create_image(
         instance,
         device,
@@ -284,7 +281,6 @@ pub fn create_alt_texture_image(
             | vk::ImageUsageFlags::TRANSFER_SRC,
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
     )?;
-    eprintln!("[create_alt_texture_image] Alt image created: {:?}, memory: {:?}", texture_image, texture_image_memory);
 
     data.texture_image_alt = texture_image;
     data.texture_image_alt_memory = texture_image_memory;
@@ -296,14 +292,12 @@ pub fn create_alt_texture_image(
 /// Create Alternate Texture ImageView
 ///
 pub fn create_alt_texture_image_view(device: &Device, data: &mut ContextData) -> Result<()> {
-    eprintln!("[create_alt_texture_image_view] Creating view for image {:?}...", data.texture_image_alt);
     data.texture_image_alt_view = tool::create_image_view(
         device,
         data.texture_image_alt,
         vk::Format::R8G8B8A8_SRGB,
         1, // mip_levels = 1
     )?;
-    eprintln!("[create_alt_texture_image_view] Alt view created: {:?}", data.texture_image_alt_view);
     Ok(())
 }
 
@@ -319,8 +313,6 @@ pub fn upload_to_texture(
     image: &DynamicImage,
     target_image: vk::Image,
 ) -> Result<()> {
-    eprintln!("[upload_to_texture] Starting upload to image {:?}...", target_image);
-
     // Resize image to match texture size
     let image_rgba = image.to_rgba8();
     let (orig_width, orig_height) = image_rgba.dimensions();
@@ -328,8 +320,6 @@ pub fn upload_to_texture(
     let target_height = data.texture_height;
 
     let image_rgba = if orig_width != target_width || orig_height != target_height {
-        eprintln!("[upload_to_texture] Resizing image from {}x{} to {}x{}",
-                  orig_width, orig_height, target_width, target_height);
         image::imageops::resize(
             &image_rgba,
             target_width,
@@ -344,61 +334,56 @@ pub fn upload_to_texture(
     let pixels = image_rgba.as_raw();
     let size = pixels.len() as u64;
 
-    eprintln!("[upload_to_texture] Final image size: {}x{}, data size: {} bytes", width, height, size);
-
     // Use cached host-visible memory type if available
-    let (staging_buffer, staging_buffer_memory) = if let Some(mem_type) = data.host_visible_memory_type {
-        eprintln!("[upload_to_texture] Using cached memory type {} for staging buffer", mem_type);
-        // Create buffer with cached memory type directly
-        let buffer_info = vk::BufferCreateInfo::builder()
-            .size(size)
-            .usage(vk::BufferUsageFlags::TRANSFER_SRC)
-            .sharing_mode(vk::SharingMode::EXCLUSIVE);
-        let buffer = unsafe { device.create_buffer(&buffer_info, None)? };
-        let requirements = unsafe { device.get_buffer_memory_requirements(buffer) };
+    let (staging_buffer, staging_buffer_memory) =
+        if let Some(mem_type) = data.host_visible_memory_type {
+            // Create buffer with cached memory type directly
+            let buffer_info = vk::BufferCreateInfo::builder()
+                .size(size)
+                .usage(vk::BufferUsageFlags::TRANSFER_SRC)
+                .sharing_mode(vk::SharingMode::EXCLUSIVE);
+            let buffer = unsafe { device.create_buffer(&buffer_info, None)? };
+            let requirements = unsafe { device.get_buffer_memory_requirements(buffer) };
 
-        let memory_info = vk::MemoryAllocateInfo::builder()
-            .allocation_size(requirements.size)
-            .memory_type_index(mem_type);
-        let memory = unsafe { device.allocate_memory(&memory_info, None)? };
-        unsafe { device.bind_buffer_memory(buffer, memory, 0)? };
-        (buffer, memory)
-    } else {
-        tool::create_buffer(
-            _instance,
-            device,
-            data,
-            size,
-            vk::BufferUsageFlags::TRANSFER_SRC,
-            vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
-        )?
-    };
-    eprintln!("[upload_to_texture] Staging buffer created");
+            let memory_info = vk::MemoryAllocateInfo::builder()
+                .allocation_size(requirements.size)
+                .memory_type_index(mem_type);
+            let memory = unsafe { device.allocate_memory(&memory_info, None)? };
+            unsafe { device.bind_buffer_memory(buffer, memory, 0)? };
+            (buffer, memory)
+        } else {
+            tool::create_buffer(
+                _instance,
+                device,
+                data,
+                size,
+                vk::BufferUsageFlags::TRANSFER_SRC,
+                vk::MemoryPropertyFlags::HOST_COHERENT | vk::MemoryPropertyFlags::HOST_VISIBLE,
+            )?
+        };
 
     // Copy data to staging buffer
-    let memory = unsafe {
-        device.map_memory(staging_buffer_memory, 0, size, vk::MemoryMapFlags::empty())?
-    };
+    let memory =
+        unsafe { device.map_memory(staging_buffer_memory, 0, size, vk::MemoryMapFlags::empty())? };
     unsafe {
         memcpy(pixels.as_ptr(), memory.cast(), pixels.len());
         device.unmap_memory(staging_buffer_memory);
     }
-    eprintln!("[upload_to_texture] Data copied to staging buffer");
 
     // Use the dedicated upload command buffer (pre-allocated, Intel GPU workaround)
     let command_buffer = data.upload_command_buffer;
 
-    eprintln!("[upload_to_texture] Resetting upload CB...");
     unsafe {
-        device.reset_command_buffer(command_buffer, vk::CommandBufferResetFlags::RELEASE_RESOURCES)?;
+        device.reset_command_buffer(
+            command_buffer,
+            vk::CommandBufferResetFlags::RELEASE_RESOURCES,
+        )?;
         let begin_info = vk::CommandBufferBeginInfo::builder()
             .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
         device.begin_command_buffer(command_buffer, &begin_info)?;
     }
 
-    eprintln!("[upload_to_texture] Recording commands to upload CB...");
     unsafe {
-
         // Transition layout UNDEFINED -> TRANSFER_DST
         let subresource_range = vk::ImageSubresourceRange::builder()
             .aspect_mask(vk::ImageAspectFlags::COLOR)
@@ -437,7 +422,11 @@ pub fn upload_to_texture(
             .buffer_image_height(0)
             .image_subresource(image_subresource)
             .image_offset(vk::Offset3D { x: 0, y: 0, z: 0 })
-            .image_extent(vk::Extent3D { width, height, depth: 1 });
+            .image_extent(vk::Extent3D {
+                width,
+                height,
+                depth: 1,
+            });
         device.cmd_copy_buffer_to_image(
             command_buffer,
             staging_buffer,
@@ -468,24 +457,24 @@ pub fn upload_to_texture(
 
         device.end_command_buffer(command_buffer)?;
     }
-    eprintln!("[upload_to_texture] Commands recorded");
 
     // Submit and wait
-    eprintln!("[upload_to_texture] Submitting commands...");
     let command_buffers = &[command_buffer];
     let submit_info = vk::SubmitInfo::builder().command_buffers(command_buffers);
     unsafe {
-        device.queue_submit(data.device_queue.graphics_queue, &[submit_info], vk::Fence::default())?;
+        device.queue_submit(
+            data.device_queue.graphics_queue,
+            &[submit_info],
+            vk::Fence::default(),
+        )?;
         device.queue_wait_idle(data.device_queue.graphics_queue)?;
     }
-    eprintln!("[upload_to_texture] Commands executed");
 
     // Cleanup
     unsafe {
         device.destroy_buffer(staging_buffer, None);
         device.free_memory(staging_buffer_memory, None);
     }
-    eprintln!("[upload_to_texture] Done!");
 
     Ok(())
 }
