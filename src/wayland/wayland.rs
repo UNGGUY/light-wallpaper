@@ -95,6 +95,7 @@ impl State {
         let layer_surface = layer_shell.get_layer_surface(
             base_surface,
             Some(output),
+            //Layer::Background,
             Layer::Background,
             "wallpaper".into(),
             qh,
@@ -108,7 +109,10 @@ impl State {
 
         // 临时 hack：强制 2x 过采样，测试 fractional scaling 是否是锯齿来源
         //base_surface.set_buffer_scale(self.output_scale.max(1));
-
+        //
+        //set_exclusive_zones是非常关键的设置，可以覆盖bar的影响
+        layer_surface.set_exclusive_zone(-1);
+        layer_surface.set_margin(0, 0, 0, 0);
         // 提交 surface
         base_surface.commit();
 
