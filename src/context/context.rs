@@ -169,6 +169,9 @@ impl Context {
 
         // Create MSAA color objects (if needed)
         //msaa::create_color_objects(&instance, &device, &mut data)?;
+        //
+        data.texture_width = width;
+        data.texture_height = height;
 
         // Create frame buffers
         frame::create_frame_buffers(&device, &mut data)?;
@@ -179,13 +182,11 @@ impl Context {
         texture::create_texture_sampler(&device, &mut data)?;
 
         // Create alternate texture for wallpaper switching
-        texture::create_alt_texture_image(&instance, &device, &mut data, &image)?;
+        texture::create_alt_texture_image(&instance, &device, &mut data)?;
         texture::create_alt_texture_image_view(&device, &mut data)?;
         data.use_alt_texture = false;
 
         // Store texture dimensions for resizing during wallpaper switch
-        data.texture_width = image.width();
-        data.texture_height = image.height();
 
         // Allocate dedicated command buffer for texture uploads (Intel GPU workaround)
         let upload_cmd_alloc_info = vk::CommandBufferAllocateInfo::builder()
@@ -280,7 +281,7 @@ impl Context {
         texture::create_texture_sampler(&device, &mut data)?;
 
         // Create alternate texture for wallpaper switching
-        texture::create_alt_texture_image(&instance, &device, &mut data, &image)?;
+        texture::create_alt_texture_image(&instance, &device, &mut data)?;
         texture::create_alt_texture_image_view(&device, &mut data)?;
         data.use_alt_texture = false;
 

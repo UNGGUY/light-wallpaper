@@ -30,8 +30,22 @@ pub fn create_texture_image(
     image: &DynamicImage,
 ) -> Result<()> {
     let image_rgba = image.to_rgba8();
+    let (orig_width, orig_height) = image_rgba.dimensions();
+    let target_width = data.texture_width;
+    let target_height = data.texture_height;
 
-    let (width, height) = image_rgba.dimensions();
+    let image_rgba = if orig_width != target_width || orig_height != target_height {
+        image::imageops::resize(
+            &image_rgba,
+            target_width,
+            target_height,
+            image::imageops::FilterType::Lanczos3,
+        )
+    } else {
+        image_rgba
+    };
+
+    let (width, height) = (data.texture_width, data.texture_height);
 
     // data.mip_levels = (width.max(height) as f32).log2().floor() as u32 + 1;
     data.mip_levels = 1;
@@ -261,10 +275,8 @@ pub fn create_alt_texture_image(
     instance: &Instance,
     device: &Device,
     data: &mut ContextData,
-    image: &DynamicImage,
 ) -> Result<()> {
-    let image_rgba = image.to_rgba8();
-    let (width, height) = image_rgba.dimensions();
+    let (width, height) = (data.texture_width, data.texture_height);
 
     let (texture_image, texture_image_memory) = tool::create_image(
         instance,
