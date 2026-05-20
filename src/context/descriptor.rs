@@ -19,11 +19,7 @@ impl DescriptorManager {
         let pool = create_descriptor_pool(device, image_count)?;
         let sets = create_descriptor_sets(device, layout, &pool, image_count)?;
 
-        Ok(Self {
-            layout,
-            pool,
-            sets,
-        })
+        Ok(Self { layout, pool, sets })
     }
 
     pub fn update(
@@ -61,7 +57,10 @@ impl DescriptorManager {
                 .image_info(image_infos);
 
             unsafe {
-                device.update_descriptor_sets(&[ubo_write, sampler_write], &[] as &[vk::CopyDescriptorSet]);
+                device.update_descriptor_sets(
+                    &[ubo_write, sampler_write],
+                    &[] as &[vk::CopyDescriptorSet],
+                );
             }
         }
     }
@@ -84,7 +83,7 @@ fn create_descriptor_set_layout(device: &Device) -> Result<vk::DescriptorSetLayo
     let sampler_binding = vk::DescriptorSetLayoutBinding::builder()
         .binding(1)
         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .descriptor_count(1)
+        .descriptor_count(2)
         .stage_flags(vk::ShaderStageFlags::FRAGMENT);
 
     let bindings = &[ubo_binding, sampler_binding];
@@ -102,7 +101,7 @@ fn create_descriptor_pool(device: &Device, image_count: usize) -> Result<vk::Des
 
     let sampler_size = vk::DescriptorPoolSize::builder()
         .type_(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .descriptor_count(image_count as u32);
+        .descriptor_count(image_count as u32 * 2);
 
     let pool_sizes = &[ubo_size, sampler_size];
 

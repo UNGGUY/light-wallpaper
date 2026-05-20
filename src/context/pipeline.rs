@@ -230,7 +230,17 @@ fn create_graphics_pipeline(
 
     // Pipeline layout
     let set_layouts = &[descriptor_set_layout];
-    let pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder().set_layouts(set_layouts);
+
+    let push_constant_range = vk::PushConstantRange::builder()
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+        .offset(0)
+        .size(std::mem::size_of::<f32>() as u32);
+
+    let push_constant_ranges = [push_constant_range];
+
+    let pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder()
+        .set_layouts(set_layouts)
+        .push_constant_ranges(&push_constant_ranges);
 
     let pipeline_layout = unsafe { device.create_pipeline_layout(&pipeline_layout_info, None)? };
 

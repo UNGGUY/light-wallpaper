@@ -94,7 +94,7 @@ pub struct ContextData {
     pub(crate) texture_image_alt: vk::Image,
     pub(crate) texture_image_alt_memory: vk::DeviceMemory,
     pub(crate) texture_image_alt_view: vk::ImageView,
-    pub(crate) use_alt_texture: bool,
+    pub(crate) used_alt_texture: bool,
     pub(crate) texture_width: u32,
     pub(crate) texture_height: u32,
 
@@ -184,7 +184,7 @@ impl Context {
         // Create alternate texture for wallpaper switching
         texture::create_alt_texture_image(&instance, &device, &mut data)?;
         texture::create_alt_texture_image_view(&device, &mut data)?;
-        data.use_alt_texture = false;
+        data.used_alt_texture = false;
 
         // Store texture dimensions for resizing during wallpaper switch
 
@@ -283,7 +283,7 @@ impl Context {
         // Create alternate texture for wallpaper switching
         texture::create_alt_texture_image(&instance, &device, &mut data)?;
         texture::create_alt_texture_image_view(&device, &mut data)?;
-        data.use_alt_texture = false;
+        data.used_alt_texture = false;
 
         // Store texture dimensions for resizing during wallpaper switch
         data.texture_width = image.width();
@@ -466,7 +466,12 @@ impl Context {
     }
 
     /// 运行时重新加载纹理（双缓冲方案 - Intel GPU workaround）
-    pub fn reload_texture(&mut self, new_path: &std::path::Path) -> Result<()> {
+    pub fn reload_texture(
+        &mut self,
+        new_path: &std::path::Path,
+        progress: f32,
+        switch: bool,
+    ) -> Result<()> {
         // 1. 等待 GPU 完全空闲
         unsafe { self.device.device_wait_idle()? };
 
@@ -474,7 +479,7 @@ impl Context {
         let new_image = texture::read_image(new_path.to_str().unwrap())?;
 
         // 3. 确定目标纹理
-        let target_image = if self.data.use_alt_texture {
+        let target_image = if self.data.used_alt_texture {
             self.data.texture_image
         } else {
             self.data.texture_image_alt
@@ -492,42 +497,81 @@ impl Context {
         // 5. 再次等待上传完成
         unsafe { self.device.device_wait_idle()? };
 
-        // 6. 切换纹理标志
-        self.data.use_alt_texture = !self.data.use_alt_texture;
-
         // 7. 选择新的纹理视图
-        let image_view = if self.data.use_alt_texture {
-            self.data.texture_image_alt_view
+        let (image_view, old_image_view) = if self.data.used_alt_texture {
+            (
+                self.data.texture_image_view,
+                self.data.texture_image_alt_view,
+            )
         } else {
-            self.data.texture_image_view
+            (
+                self.data.texture_image_alt_view,
+                self.data.texture_image_view,
+            )
         };
 
         unsafe { self.device.device_wait_idle()? };
 
-        // 8. 逐个更新描述符集（避免生命周期问题）
-        for set in &self.data.descriptor_manager.sets {
+        if switch {
             let image_info = vk::DescriptorImageInfo::builder()
+                .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                .image_view(old_image_view)
+                .sampler(self.data.texture_image_sampler)
+                .build();
+
+            let image_info1 = vk::DescriptorImageInfo::builder()
                 .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
                 .image_view(image_view)
                 .sampler(self.data.texture_image_sampler)
                 .build();
 
-            let write = vk::WriteDescriptorSet::builder()
-                .dst_set(*set)
-                .dst_binding(1)
-                .dst_array_element(0)
-                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                .image_info(std::slice::from_ref(&image_info))
-                .build();
+            let image_infos = [image_info, image_info1];
+            // 8. 逐个更新描述符集（避免生命周期问题）
+            for set in &self.data.descriptor_manager.sets {
+                let write = vk::WriteDescriptorSet::builder()
+                    .dst_set(*set)
+                    .dst_binding(1)
+                    .dst_array_element(0)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(&image_infos)
+                    .build();
 
-            unsafe {
-                self.device
-                    .update_descriptor_sets(&[write], &[] as &[vk::CopyDescriptorSet]);
+                unsafe {
+                    self.device
+                        .update_descriptor_sets(&[write], &[] as &[vk::CopyDescriptorSet]);
+                }
             }
         }
 
+        if progress == 1.0 {
+            // 8. 逐个更新描述符集（避免生命周期问题）
+            for set in &self.data.descriptor_manager.sets {
+                let image_info = vk::DescriptorImageInfo::builder()
+                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                    .image_view(image_view)
+                    .sampler(self.data.texture_image_sampler)
+                    .build();
+
+                let write = vk::WriteDescriptorSet::builder()
+                    .dst_set(*set)
+                    .dst_binding(1)
+                    .dst_array_element(0)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(std::slice::from_ref(&image_info))
+                    .build();
+
+                unsafe {
+                    self.device
+                        .update_descriptor_sets(&[write], &[] as &[vk::CopyDescriptorSet]);
+                }
+            }
+
+            // 6. 切换纹理标志
+            self.data.used_alt_texture = !self.data.used_alt_texture;
+        }
+
         // 9. 重新记录 command buffers（descriptor set 已更新，必须重新记录）
-        CommandManager::record_command_buffers(&self.device, &mut self.data)?;
+        CommandManager::record_command_buffers(&self.device, &mut self.data, progress)?;
 
         Ok(())
     }

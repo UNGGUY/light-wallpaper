@@ -39,7 +39,11 @@ impl CommandManager {
         Ok(&self.buffers)
     }
 
-    pub fn record_command_buffers(device: &Device, data: &mut ContextData) -> Result<()> {
+    pub fn record_command_buffers(
+        device: &Device,
+        data: &mut ContextData,
+        progress: f32,
+    ) -> Result<()> {
         for (i, command_buffer) in data.command_manager.buffers.iter().enumerate() {
             let info = vk::CommandBufferBeginInfo::builder();
             unsafe { device.begin_command_buffer(*command_buffer, &info)? };
@@ -82,6 +86,13 @@ impl CommandManager {
                     0,
                     &[data.descriptor_manager.sets[i]],
                     &[],
+                );
+                device.cmd_push_constants(
+                    *command_buffer,
+                    data.pipeline.layout,
+                    vk::ShaderStageFlags::FRAGMENT,
+                    0,
+                    &progress.to_ne_bytes(),
                 );
                 device.cmd_draw_indexed(*command_buffer, vertex::INDICES.len() as u32, 1, 0, 0, 0);
                 device.cmd_end_render_pass(*command_buffer);

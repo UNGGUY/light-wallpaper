@@ -40,6 +40,9 @@ fn main() {
 
     let mut manager = Manager::new(directory, 5).unwrap();
 
+    let mut switch = false;
+    let mut next_path;
+
     while state.running {
         event_queue.blocking_dispatch(&mut state).unwrap();
 
@@ -58,14 +61,16 @@ fn main() {
                 .unwrap(),
             );
         }
-
         if state.configured && state.render {
             if let Some(context) = state.context.as_mut() {
                 if let Some(path) = manager.update() {
-                    if let Err(err) = context.reload_texture(path) {
-                        println!("{0}", err);
-                    }
+                    switch = true;
+                    next_path = path;
                 }
+                if switch {
+                    context.reload_texture(next_path, progress, switch);
+                }
+
                 context.render_wayland().unwrap();
             }
             if let Some(surface) = state.base_surface.as_ref() {
