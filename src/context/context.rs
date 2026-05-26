@@ -2,6 +2,7 @@
 use std::collections::HashSet;
 use std::ffi::c_void;
 use std::mem::ManuallyDrop;
+use std::path::Path;
 use std::ptr::copy_nonoverlapping as memcpy;
 use std::time::Instant;
 
@@ -117,12 +118,13 @@ impl Context {
         display: *mut c_void,
         width: u32,
         height: u32,
+        new_path: &std::path::Path,
     ) -> Result<Self> {
         let loader = unsafe { LibloadingLoader::new(LIBRARY)? };
         let entry = unsafe { Entry::new(loader).map_err(|b| anyhow!(b))? };
 
         let instance = instance::create_instance_wayland(&entry)?;
-        let image = texture::read_image("assets/wallhaven-3q3wj3.jpg")?;
+        let image = texture::read_image(new_path.to_str().unwrap())?;
 
         let mut data = ContextData::default();
 
@@ -151,7 +153,7 @@ impl Context {
 
         // Create pipeline
         let vert_shader = include_bytes!("../../shader/vert.spv");
-        let frag_shader = include_bytes!("../../shader/frag.spv");
+        let frag_shader = include_bytes!("../../shader/frag3.spv");
         data.pipeline = Pipeline::create(
             &device,
             data.swapchain.format,
@@ -215,108 +217,7 @@ impl Context {
         data.sync_objects = SyncObjects::create(&device, data.swapchain.images.len())?;
 
         // Record command buffers
-        CommandManager::record_command_buffers(&device, &mut data)?;
-
-        Ok(Self {
-            instance,
-            data,
-            device,
-            frame: 0,
-            start: Instant::now(),
-        })
-    }
-
-    pub fn create(window: &Window) -> Result<Self> {
-        let loader = unsafe { LibloadingLoader::new(LIBRARY)? };
-        let entry = unsafe { Entry::new(loader).map_err(|b| anyhow!(b))? };
-
-        let instance = instance::create_instance(window, &entry)?;
-        let image = texture::read_image("assets/wallhaven-3q3wj3.jpg")?;
-
-        let mut data = ContextData::default();
-
-        data.surface = unsafe { vk_window::create_surface(&instance, window, window)? };
-
-        data.device_manager = DeviceManager::create(&instance, data.surface)?;
-        let (device, device_queue) =
-            crate::context::device::create_logical_device(&instance, &data.device_manager)?;
-        data.device_queue = device_queue;
-
-        // Create swapchain
-        data.swapchain = Swapchain::create_for_winit(
-            window,
-            &instance,
-            &device,
-            &data.device_manager,
-            data.surface,
-        )?;
-
-        // Create descriptor manager
-        data.descriptor_manager = DescriptorManager::create(&device, data.swapchain.images.len())?;
-
-        // Create pipeline
-        let vert_shader = include_bytes!("../../shader/vert.spv");
-        let frag_shader = include_bytes!("../../shader/frag1.spv");
-        data.pipeline = Pipeline::create(
-            &device,
-            data.swapchain.format,
-            data.swapchain.extent,
-            data.msaa_samples,
-            data.descriptor_manager.layout,
-            vert_shader,
-            frag_shader,
-        )?;
-
-        // Create command manager
-        data.command_manager = CommandManager::create(&instance, &device, &mut data)?;
-        data.command_manager
-            .allocate_buffers(&device, data.swapchain.images.len() as u32)?;
-
-        // Create frame buffers
-        frame::create_frame_buffers(&device, &mut data)?;
-
-        // Create texture (double buffering for Intel GPU workaround)
-        texture::create_texture_image(&instance, &device, &mut data, &image)?;
-        texture::create_texture_image_view(&device, &mut data)?;
-        texture::create_texture_sampler(&device, &mut data)?;
-
-        // Create alternate texture for wallpaper switching
-        texture::create_alt_texture_image(&instance, &device, &mut data)?;
-        texture::create_alt_texture_image_view(&device, &mut data)?;
-        data.used_alt_texture = false;
-
-        // Store texture dimensions for resizing during wallpaper switch
-        data.texture_width = image.width();
-        data.texture_height = image.height();
-
-        // Allocate dedicated command buffer for texture uploads (Intel GPU workaround)
-        let upload_cmd_alloc_info = vk::CommandBufferAllocateInfo::builder()
-            .level(vk::CommandBufferLevel::PRIMARY)
-            .command_pool(data.command_manager.pool)
-            .command_buffer_count(1);
-        data.upload_command_buffer =
-            unsafe { device.allocate_command_buffers(&upload_cmd_alloc_info)?[0] };
-
-        // Create vertex and index buffers
-        vertex::create_vertex_buffer(&instance, &device, &mut data)?;
-        vertex::create_index_buffer(&instance, &device, &mut data)?;
-
-        // Create uniform buffers
-        uniform::create_uniform_buffers(&instance, &device, &mut data)?;
-
-        // Update descriptor sets
-        data.descriptor_manager.update(
-            &device,
-            &data.uniform_buffers,
-            data.texture_image_view,
-            data.texture_image_sampler,
-        );
-
-        // Create sync objects
-        data.sync_objects = SyncObjects::create(&device, data.swapchain.images.len())?;
-
-        // Record command buffers
-        CommandManager::record_command_buffers(&device, &mut data)?;
+        CommandManager::record_command_buffers(&device, &mut data, 0.0)?;
 
         Ok(Self {
             instance,
@@ -466,12 +367,7 @@ impl Context {
     }
 
     /// 运行时重新加载纹理（双缓冲方案 - Intel GPU workaround）
-    pub fn reload_texture(
-        &mut self,
-        new_path: &std::path::Path,
-        progress: f32,
-        switch: bool,
-    ) -> Result<()> {
+    pub fn reload_texture(&mut self, new_path: &std::path::Path) -> Result<()> {
         // 1. 等待 GPU 完全空闲
         unsafe { self.device.device_wait_idle()? };
 
@@ -494,6 +390,10 @@ impl Context {
             target_image,
         )?;
 
+        Ok(())
+    }
+
+    pub fn switch(&mut self, progress: f32, first: bool) -> Result<()> {
         // 5. 再次等待上传完成
         unsafe { self.device.device_wait_idle()? };
 
@@ -510,9 +410,45 @@ impl Context {
             )
         };
 
-        unsafe { self.device.device_wait_idle()? };
+        if progress >= 1.0 {
+            println!("finish");
+            if self.data.used_alt_texture {
+                println!("true");
+            } else {
+                println!("false");
+            }
+            // 8. 逐个更新描述符集（避免生命周期问题）
+            for set in &self.data.descriptor_manager.sets {
+                let image_info = vk::DescriptorImageInfo::builder()
+                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                    .image_view(image_view)
+                    .sampler(self.data.texture_image_sampler)
+                    .build();
+                let image_info1 = vk::DescriptorImageInfo::builder()
+                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                    .image_view(image_view)
+                    .sampler(self.data.texture_image_sampler)
+                    .build();
 
-        if switch {
+                let image_infos = [image_info, image_info1];
+
+                let write = vk::WriteDescriptorSet::builder()
+                    .dst_set(*set)
+                    .dst_binding(1)
+                    .dst_array_element(0)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(&image_infos)
+                    .build();
+
+                unsafe {
+                    self.device
+                        .update_descriptor_sets(&[write], &[] as &[vk::CopyDescriptorSet]);
+                }
+            }
+            self.data.used_alt_texture = !self.data.used_alt_texture;
+        }
+        if first {
+            println!("first");
             let image_info = vk::DescriptorImageInfo::builder()
                 .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
                 .image_view(old_image_view)
@@ -543,36 +479,7 @@ impl Context {
             }
         }
 
-        if progress == 1.0 {
-            // 8. 逐个更新描述符集（避免生命周期问题）
-            for set in &self.data.descriptor_manager.sets {
-                let image_info = vk::DescriptorImageInfo::builder()
-                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-                    .image_view(image_view)
-                    .sampler(self.data.texture_image_sampler)
-                    .build();
-
-                let write = vk::WriteDescriptorSet::builder()
-                    .dst_set(*set)
-                    .dst_binding(1)
-                    .dst_array_element(0)
-                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                    .image_info(std::slice::from_ref(&image_info))
-                    .build();
-
-                unsafe {
-                    self.device
-                        .update_descriptor_sets(&[write], &[] as &[vk::CopyDescriptorSet]);
-                }
-            }
-
-            // 6. 切换纹理标志
-            self.data.used_alt_texture = !self.data.used_alt_texture;
-        }
-
-        // 9. 重新记录 command buffers（descriptor set 已更新，必须重新记录）
         CommandManager::record_command_buffers(&self.device, &mut self.data, progress)?;
-
         Ok(())
     }
 

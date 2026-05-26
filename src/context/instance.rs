@@ -1,3 +1,4 @@
+#![allow(unused)]
 use anyhow::Result;
 use anyhow::anyhow;
 use std::collections::HashSet;

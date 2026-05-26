@@ -1,7 +1,10 @@
 #![allow(unused)]
+use std::cmp::min;
+
 use crate::context::ContextData;
 use crate::context::tool::QueueFamilyindices;
 use crate::context::vertex;
+use crate::main;
 use anyhow::Result;
 use vulkanalia::Device;
 use vulkanalia::Instance;
@@ -44,6 +47,7 @@ impl CommandManager {
         data: &mut ContextData,
         progress: f32,
     ) -> Result<()> {
+        let progress = progress.min(1.0);
         for (i, command_buffer) in data.command_manager.buffers.iter().enumerate() {
             let info = vk::CommandBufferBeginInfo::builder();
             unsafe { device.begin_command_buffer(*command_buffer, &info)? };
@@ -86,6 +90,62 @@ impl CommandManager {
                     0,
                     &[data.descriptor_manager.sets[i]],
                     &[],
+                );
+                device.cmd_push_constants(
+                    *command_buffer,
+                    data.pipeline.layout,
+                    vk::ShaderStageFlags::FRAGMENT,
+                    0,
+                    &progress.to_ne_bytes(),
+                );
+                device.cmd_draw_indexed(*command_buffer, vertex::INDICES.len() as u32, 1, 0, 0, 0);
+                device.cmd_end_render_pass(*command_buffer);
+                device.end_command_buffer(*command_buffer)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn switch_command_buffers(
+        device: &Device,
+        data: &mut ContextData,
+        progress: f32,
+    ) -> Result<()> {
+        let progress = progress.min(1.0);
+        for (i, command_buffer) in data.command_manager.buffers.iter().enumerate() {
+            let info = vk::CommandBufferBeginInfo::builder();
+            unsafe { device.begin_command_buffer(*command_buffer, &info)? };
+
+            let render_area = vk::Rect2D::builder()
+                .offset(vk::Offset2D::default())
+                .extent(data.swapchain.extent);
+
+            let color_clear_value = vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: [0.0, 0.0, 0.0, 1.0],
+                },
+            };
+
+            let clear_values = &[color_clear_value];
+            let info = vk::RenderPassBeginInfo::builder()
+                .render_pass(data.pipeline.render_pass)
+                .framebuffer(data.frame_buffers[i])
+                .render_area(render_area)
+                .clear_values(clear_values);
+
+            unsafe {
+                device.cmd_begin_render_pass(*command_buffer, &info, vk::SubpassContents::INLINE);
+                device.cmd_bind_pipeline(
+                    *command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    data.pipeline.pipeline,
+                );
+                device.cmd_bind_vertex_buffers(*command_buffer, 0, &[data.vertex_buffer], &[0]);
+                device.cmd_bind_index_buffer(
+                    *command_buffer,
+                    data.index_buffer,
+                    0,
+                    vk::IndexType::UINT16,
                 );
                 device.cmd_push_constants(
                     *command_buffer,

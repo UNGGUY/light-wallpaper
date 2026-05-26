@@ -48,7 +48,12 @@ impl DescriptorManager {
                 .image_view(texture_view)
                 .sampler(texture_sampler);
 
-            let image_infos = &[image_info];
+            let image_info1 = vk::DescriptorImageInfo::builder()
+                .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                .image_view(texture_view)
+                .sampler(texture_sampler);
+
+            let image_infos = &[image_info, image_info1];
             let sampler_write = vk::WriteDescriptorSet::builder()
                 .dst_set(self.sets[i])
                 .dst_binding(1)

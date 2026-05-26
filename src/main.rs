@@ -2,13 +2,14 @@ use std::os::raw::c_void;
 
 use std::path::Path;
 
+use std::time::Instant;
+
 use wayland_client::{Connection, Proxy};
 
 use context::Context;
 use wallpaper::Manager;
 use wayland::State;
 
-mod app;
 mod context;
 mod wallpaper;
 mod wayland;
@@ -38,10 +39,12 @@ fn main() {
 
     let directory = Path::new("assets/wallpapers/");
 
-    let mut manager = Manager::new(directory, 5).unwrap();
+    let mut manager = Manager::new(directory, 15).unwrap();
 
     let mut switch = false;
-    let mut next_path;
+    let mut first = false;
+    let mut animation_start_time: Option<Instant> = None;
+    let first_path = manager.update().unwrap().to_path_buf();
 
     while state.running {
         event_queue.blocking_dispatch(&mut state).unwrap();
@@ -57,18 +60,48 @@ fn main() {
                     display_ptr,
                     state.width * (state.output_scale.max(1) as u32),
                     state.height * (state.output_scale.max(1) as u32),
+                    &first_path,
                 )
                 .unwrap(),
             );
         }
         if state.configured && state.render {
             if let Some(context) = state.context.as_mut() {
-                if let Some(path) = manager.update() {
-                    switch = true;
-                    next_path = path;
+                if !switch {
+                    if let Some(path) = manager.update() {
+                        switch = true;
+                        first = true;
+                        println!("path:{:?}", path);
+                        context.reload_texture(path).unwrap();
+                    }
                 }
                 if switch {
-                    context.reload_texture(next_path, progress, switch);
+                    if animation_start_time.is_none() {
+                        animation_start_time = Some(Instant::now());
+                    }
+
+                    // 2. 计算当前的渐变进度 (progress)
+                    let elapsed = animation_start_time.unwrap().elapsed();
+                    let raw_progress = (elapsed.as_secs_f32() / 1.0).min(1.0); // 假设动画总时长为 1.0 秒
+                    //
+                    let t = raw_progress; // 假设 raw_progress 是 f32
+                    let smooth_progress = if t < 0.5 {
+                        2.0_f32 * t * t
+                    } else {
+                        // 注意：这里的 -2.0 和 2.0 也要加上 _f32 后缀
+                        1.0_f32 - (-2.0_f32 * t + 2.0_f32).powi(2) / 2.0_f32
+                    };
+
+                    context.switch(smooth_progress, first).unwrap();
+
+                    if first {
+                        first = false;
+                    }
+
+                    if smooth_progress >= 1.0 {
+                        switch = false;
+                        animation_start_time = None;
+                    }
                 }
 
                 context.render_wayland().unwrap();

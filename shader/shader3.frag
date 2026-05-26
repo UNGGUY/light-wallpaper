@@ -1,4 +1,5 @@
 #version 450
+layout(location = 0) in vec2 fragTexCoord;
 
 // 如果你的 UBO 里还有其他数据（比如分辨率），可以保留；如果没有，UBO 也可以直接删掉
 layout(binding = 0) uniform UniformBufferObject{
@@ -6,14 +7,15 @@ layout(binding = 0) uniform UniformBufferObject{
   vec2 iResolution;
 }ubo;
 
+layout(binding = 1) uniform sampler2D texSamplers[2];
 
-// 声明 Push Constant 块，接收 Rust 端推过来的 progress
 layout(push_constant) uniform PushConstants {
     float progress;
 } pc;
 
-layout(binding = 1) uniform sampler2D texSamplers[2];
 layout(location = 0) out vec4 outColor;
+
+
 
 void main() {
     float screenAspect = ubo.iResolution.x / ubo.iResolution.y;
@@ -33,6 +35,7 @@ void main() {
     vec4 oldColor = texture(texSamplers[0], uv);
     vec4 newColor = texture(texSamplers[1], uv);
 
-    // 核心：直接使用 pc.progress 进行混合
-    outColor = mix(oldColor, newColor, pc.progress);
+      outColor = mix(oldColor, newColor, pc.progress);
+
+
 }
