@@ -87,6 +87,11 @@ impl Manager {
         false
     }
 
+    pub fn first(&mut self) -> Option<&Path> {
+        let next_path = self.move_to_next();
+        return Some(next_path);
+    }
+
     /// 每帧调用，检查是否需要切换
     /// 返回：Some(path) 表示需要切换到指定壁纸，None 表示保持当前
     pub fn update(&mut self) -> Option<&Path> {

@@ -44,7 +44,8 @@ fn main() {
     let mut switch = false;
     let mut first = false;
     let mut animation_start_time: Option<Instant> = None;
-    let first_path = manager.update().unwrap().to_path_buf();
+
+    let mut num: u32 = 0;
 
     while state.running {
         event_queue.blocking_dispatch(&mut state).unwrap();
@@ -53,6 +54,8 @@ fn main() {
             let display_ptr = conn.backend().display_ptr() as *mut c_void;
 
             let surface_ptr = state.base_surface.as_ref().unwrap().id().as_ptr() as *mut c_void;
+
+            let first_path = manager.first().unwrap();
 
             state.context = Some(
                 Context::create_for_wayland(
@@ -71,7 +74,6 @@ fn main() {
                     if let Some(path) = manager.update() {
                         switch = true;
                         first = true;
-                        println!("path:{:?}", path);
                         context.reload_texture(path).unwrap();
                     }
                 }
@@ -103,7 +105,7 @@ fn main() {
                         animation_start_time = None;
                     }
                 }
-
+                num += 1;
                 context.render_wayland().unwrap();
             }
             if let Some(surface) = state.base_surface.as_ref() {
