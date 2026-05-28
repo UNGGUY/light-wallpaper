@@ -42,10 +42,8 @@ fn main() {
     let mut manager = Manager::new(directory, 15).unwrap();
 
     let mut switch = false;
-    let mut first = false;
     let mut animation_start_time: Option<Instant> = None;
-
-    let mut num: u32 = 0;
+    let mut first = false;
 
     while state.running {
         event_queue.blocking_dispatch(&mut state).unwrap();
@@ -63,7 +61,7 @@ fn main() {
                     display_ptr,
                     state.width * (state.output_scale.max(1) as u32),
                     state.height * (state.output_scale.max(1) as u32),
-                    &first_path,
+                    first_path,
                 )
                 .unwrap(),
             );
@@ -105,7 +103,6 @@ fn main() {
                         animation_start_time = None;
                     }
                 }
-                num += 1;
                 context.render_wayland().unwrap();
             }
             if let Some(surface) = state.base_surface.as_ref() {

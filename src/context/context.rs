@@ -118,13 +118,13 @@ impl Context {
         display: *mut c_void,
         width: u32,
         height: u32,
-        new_path: &std::path::Path,
+        path: &Path,
     ) -> Result<Self> {
         let loader = unsafe { LibloadingLoader::new(LIBRARY)? };
         let entry = unsafe { Entry::new(loader).map_err(|b| anyhow!(b))? };
 
         let instance = instance::create_instance_wayland(&entry)?;
-        let image = texture::read_image(new_path.to_str().unwrap())?;
+        let image = texture::read_image(path)?;
 
         let mut data = ContextData::default();
 
@@ -367,12 +367,12 @@ impl Context {
     }
 
     /// 运行时重新加载纹理（双缓冲方案 - Intel GPU workaround）
-    pub fn reload_texture(&mut self, new_path: &std::path::Path) -> Result<()> {
+    pub fn reload_texture(&mut self, path: &Path) -> Result<()> {
         // 1. 等待 GPU 完全空闲
         unsafe { self.device.device_wait_idle()? };
 
         // 2. 读取新图片
-        let new_image = texture::read_image(new_path.to_str().unwrap())?;
+        let new_image = texture::read_image(path)?;
 
         // 3. 确定目标纹理
         let target_image = if self.data.used_alt_texture {
@@ -411,12 +411,6 @@ impl Context {
         };
 
         if progress >= 1.0 {
-            println!("finish");
-            if self.data.used_alt_texture {
-                println!("true");
-            } else {
-                println!("false");
-            }
             // 8. 逐个更新描述符集（避免生命周期问题）
             for set in &self.data.descriptor_manager.sets {
                 let image_info = vk::DescriptorImageInfo::builder()

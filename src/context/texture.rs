@@ -5,6 +5,7 @@ use crate::context::tool;
 use anyhow::{Result, anyhow};
 use image::DynamicImage;
 use image::ImageReader;
+use std::path::Path;
 
 use vulkanalia::Device;
 use vulkanalia::Instance;
@@ -15,7 +16,7 @@ use vulkanalia::vk::ImageLayout;
 
 use std::ptr::copy_nonoverlapping as memcpy;
 
-pub fn read_image(path: &str) -> Result<DynamicImage> {
+pub fn read_image(path: &Path) -> Result<DynamicImage> {
     let image = ImageReader::open(path)?.decode()?;
     Ok(image)
 }

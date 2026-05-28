@@ -1,5 +1,8 @@
 #![allow(unused)]
 use anyhow::{Context as _, Result};
+use image::DynamicImage;
+use image::ImageReader;
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -23,6 +26,8 @@ pub struct Manager {
     interval: Duration,
     /// 播放模式
     mode: PlayMode,
+    /// 图片队列
+    images: VecDeque<DynamicImage>,
 }
 
 impl Manager {
@@ -34,16 +39,21 @@ impl Manager {
     pub fn new(directory: &Path, interval_secs: u64) -> Result<Self> {
         let wallpapers = Self::scan_directory(directory)?;
 
+        let current_index = 5;
+
+        let images = Self::read_images(&wallpapers, current_index)?;
+
         if wallpapers.is_empty() {
             anyhow::bail!("No supported wallpaper images found in: {:?}", directory);
         }
 
         Ok(Self {
             wallpapers,
-            current_index: 0,
+            current_index: current_index,
             last_switch: Instant::now(),
             interval: Duration::from_secs(interval_secs),
             mode: PlayMode::Sequential,
+            images,
         })
     }
 
@@ -217,5 +227,17 @@ impl Manager {
         self.current_index = index;
         self.last_switch = Instant::now();
         Ok(&self.wallpapers[self.current_index])
+    }
+
+    pub fn read_images(
+        wallpapers: &Vec<PathBuf>,
+        current_index: usize,
+    ) -> Result<VecDeque<DynamicImage>> {
+        let mut images: VecDeque<DynamicImage> = VecDeque::new();
+        for path in wallpapers.iter().take(current_index) {
+            let image = ImageReader::open(path)?.decode()?;
+            images.push_back(image);
+        }
+        Ok(images)
     }
 }
