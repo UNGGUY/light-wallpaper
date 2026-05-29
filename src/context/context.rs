@@ -153,7 +153,7 @@ impl Context {
 
         // Create pipeline
         let vert_shader = include_bytes!("../../shader/vert.spv");
-        let frag_shader = include_bytes!("../../shader/frag3.spv");
+        let frag_shader = include_bytes!("../../shader/frag4.spv");
         data.pipeline = Pipeline::create(
             &device,
             data.swapchain.format,
@@ -442,7 +442,6 @@ impl Context {
             self.data.used_alt_texture = !self.data.used_alt_texture;
         }
         if first {
-            println!("first");
             let image_info = vk::DescriptorImageInfo::builder()
                 .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
                 .image_view(old_image_view)

@@ -63,7 +63,6 @@ void main() {
 
     // 2. Progress 缓动 (让转场节奏更自然，避免线性生硬感)
     float t = pc.progress;
-    t = t * t * (3.0 - 2.0 * t); // Smoothstep easing
 
    // 3. 噪声溶解核心逻辑
     float noiseFreq = 6.0;
@@ -85,7 +84,7 @@ void main() {
     vec4 newColor = texture(texSamplers[1], uv);
     
     // oldToNew=0 → oldColor, oldToNew=1 → newColor
-    outColor = mix(oldColor, newColor, oldToNew);
+    outColor = mix(newColor, oldColor, oldToNew);
     outColor.rgb += glowColor;
     
 }
