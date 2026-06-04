@@ -18,13 +18,13 @@
 *** for contributors-url, forks-url, etc. This is an optional, concise syntax you may use.
 *** https://www.markdownguide.org/basic-syntax/#reference-style-links
 -->
-[![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
-[![Unlicense License][license-shield]][license-url]
-[![LinkedIn][linkedin-shield]][linkedin-url]
-
+<!-- [![Contributors][contributors-shield]][contributors-url] -->
+<!-- [![Forks][forks-shield]][forks-url] -->
+<!-- [![Stargazers][stars-shield]][stars-url] -->
+<!-- [![Issues][issues-shield]][issues-url] -->
+<!-- [![Unlicense License][license-shield]][license-url] -->
+<!-- [![LinkedIn][linkedin-shield]][linkedin-url] -->
+<!---->
 
 
 <!-- PROJECT LOGO -->
@@ -94,57 +94,73 @@ light-wallpaper is a pure native Vulkan dynamic wallpaper engine for Wayland.
 ### Built With
 
 
-* [![Next][Next.js]][Next-url]
-* [![React][React.js]][React-url]
-* [![Vue][Vue.js]][Vue-url]
-* [![Angular][Angular.io]][Angular-url]
-* [![Svelte][Svelte.dev]][Svelte-url]
-* [![Laravel][Laravel.com]][Laravel-url]
-* [![Bootstrap][Bootstrap.com]][Bootstrap-url]
 
 * [![Rust][Rust]][Rust-url]
 * [![VulkanSDK][VulkanSDK]][VulkanSDK-url]
 
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
-
+``
 <!-- GETTING STARTED -->
 ## Getting Started
 
-This is an example of how you may give instructions on setting up your project locally.
-To get a local copy up and running follow these simple example steps.
-
 ### Prerequisites
 
-This is an example of how to list things you need to use the software and how to install them.
-* npm
-  ```sh
-  npm install npm@latest -g
-  ```
+1. Clone this repository to local:
+```sh
+git clone https://github.com/UNGGUY/light-wallpaper.git
+```
 
-### Installation
+2. Vulkan SDK
+The most important component you'll need for developing Vulkan applications is the SDK. It includes the headers, standard validation layers, debugging tools and a loader for the Vulkan functions. The loader looks up the functions in the driver at runtime, similarly to GLEW for OpenGL - if you're familiar with that.
 
-_Below is an example of how you can instruct your audience on installing and setting up your app. This template doesn't rely on any external dependencies or services._
+Download the Vulkan SDK installer from [VulkanSDK-url], and add it to your system environment variables after installation.
 
-1. Get a free API Key at [https://example.com](https://example.com)
-2. Clone the repo
-   ```sh
-   git clone https://github.com/github_username/repo_name.git
-   ```
-3. Install NPM packages
-   ```sh
-   npm install
-   ```
-4. Enter your API in `config.js`
-   ```js
-   const API_KEY = 'ENTER YOUR API';
-   ```
-5. Change git remote url to avoid accidental pushes to base project
-   ```sh
-   git remote set-url origin github_username/repo_name
-   git remote -v # confirm the changes
-   ```
+If you are using the default Bash or Zsh shell (common on most Linux distributions), append the following commands to your ~/.bashrc ~/.zshrc file:
+```sh
+# Set the Vulkan SDK root directory (Modify this to match your actual installation path)
+export VULKAN_SDK=~/Program/vulkan/1.4.350.0/x86_64
+
+# Add Vulkan tools and libraries to the system PATH
+export PATH=$VULKAN_SDK/bin:$PATH
+export LD_LIBRARY_PATH=$VULKAN_SDK/lib:$LD_LIBRARY_PATH
+
+# Configure validation layer paths
+export VK_LAYER_PATH=$VULKAN_SDK/share/vulkan/explicit_layer.d
+export VK_ADD_LAYER_PATH=$VULKAN_SDK/share/vulkan/explicit_layer.d
+
+# Provide build support for CMake and pkg-config
+export PKG_CONFIG_PATH=$VULKAN_SDK/lib/pkgconfig/:$PKG_CONFIG_PATH
+export CMAKE_PREFIX_PATH=$VULKAN_SDK:$VULKAN_SDK/lib/VulkanLoader:$CMAKE_PREFIX_PATH``
+```
+
+
+If you are using the Fish shell, add the following commands to your ~/.config/fish/config.fish file:
+```fish
+# Set the Vulkan SDK root directory (Modify this to match your actual installation path)
+set -gx VULKAN_SDK ~/Program/vulkan/1.4.350.0/x86_64
+
+# Add Vulkan tools and libraries to the system PATH
+set -gx PATH $VULKAN_SDK/bin $PATH
+set -gx LD_LIBRARY_PATH $VULKAN_SDK/lib $LD_LIBRARY_PATH
+
+# Configure validation layer paths
+set -gx VK_LAYER_PATH $VULKAN_SDK/share/vulkan/explicit_layer.d
+set -gx VK_ADD_LAYER_PATH $VULKAN_SDK/share/vulkan/explicit_layer.d
+
+# Provide build support for CMake and pkg-config
+set -gx PKG_CONFIG_PATH $VULKAN_SDK/lib/pkgconfig/ $PKG_CONFIG_PATH
+set -gx CMAKE_PREFIX_PATH $VULKAN_SDK $VULKAN_SDK/lib/VulkanLoader $CMAKE_PREFIX_PATH
+```
+
+3. Add your wallpaper
+**This project does not include any wallpapers.** You will need to add them yourself.By default, wallpaper files are placed in the assets/wallpapers/ folder at the project root.
+To change the default wallpaper directory, edit line 40 in main.rs: 
+```rust
+let directory = Path::new("assets/wallpapers/");
+```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -152,27 +168,42 @@ _Below is an example of how you can instruct your audience on installing and set
 
 <!-- USAGE EXAMPLES -->
 ## Usage
+After completing the steps above, run the following command to launch the project:
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
+```sh
+cargo run --release
+```
 
-_For more examples, please refer to the [Documentation](https://example.com)_
+Run the following command to check out the branch that includes wallpaper transitions:
+```sh
+git checkout wManager
+
+cargo run --release
+```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 
 
 
 <!-- ROADMAP -->
 ## Roadmap
 
-- [x] Add Changelog
-- [x] Add back to top links
-- [ ] Add Additional Templates w/ Examples
-- [ ] Add "components" document to easily copy & paste sections of the readme
-- [ ] Multi-language Support
-    - [ ] Chinese
-    - [ ] Spanish
 
-See the [open issues](https://github.com/othneildrew/Best-README-Template/issues) for a full list of proposed features (and known issues).
+- [x] **Core Rendering**
+    - [x] Vulkan graphics pipeline initialization
+    - [x] Wayland protocol integration & window management
+    - [x] Shader loading and compilation
+- [x] **Basic Functionality**
+    - [x] Image/video wallpaper rendering
+    - [x] Wallpaper transitions (e.g., fade-in/fade-out)
+- [ ] **Planned Features**
+    - [ ] Configuration file support
+    - [ ] Dynamic wallpaper scripting interface
+    - [ ] Multi-monitor support
+- [ ] **Optimizations**
+    - [ ] Memory leak detection and fixes
+    - [ ] Rendering performance profiling
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -180,26 +211,28 @@ See the [open issues](https://github.com/othneildrew/Best-README-Template/issues
 
 <!-- CONTRIBUTING -->
 ## Contributing
-
 Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
-If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
+If you have a suggestion that would make this project better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement". 
 Don't forget to give the project a star! Thanks again!
 
+### Getting Started
+
 1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
+2. Create your Feature Branch (`git checkout -b feature/shader-optimization`)
+3. Commit your Changes (`git commit -m 'Optimize vulkan pipeline for smoother transitions'`)
+4. Push to the Branch (`git push origin feature/shader-optimization`)
 5. Open a Pull Request
 
-### Top contributors:
+> 💡 **Tip:** Since this project involves low-level APIs like Vulkan and Wayland, if you're planning a major feature or architectural change, please open an issue first so we can discuss it before you start coding!``
 
-<a href="https://github.com/othneildrew/Best-README-Template/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=othneildrew/Best-README-Template" alt="contrib.rocks image" />
-</a>
+<!-- ### Top contributors: -->
+<!---->
+<!-- <a href="https://github.com/othneildrew/Best-README-Template/graphs/contributors"> -->
+<!--   <img src="https://contrib.rocks/image?repo=othneildrew/Best-README-Template" alt="contrib.rocks image" /> -->
+<!-- </a> -->
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 
 
 <!-- LICENSE -->
@@ -208,8 +241,6 @@ Don't forget to give the project a star! Thanks again!
 Distributed under the Unlicense License. See `LICENSE.txt` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- CONTACT -->
 ## Contact
@@ -258,27 +289,10 @@ Use this space to list resources you find helpful and would like to give credit 
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/othneildrew
 [product-screenshot]: images/screenshot.png
-[Next.js]: https://img.shields.io/badge/next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white
-[Next-url]: https://nextjs.org/
-[React.js]: https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB
-[React-url]: https://reactjs.org/
-[Vue.js]: https://img.shields.io/badge/Vue.js-35495E?style=for-the-badge&logo=vuedotjs&logoColor=4FC08D
-[Vue-url]: https://vuejs.org/
-[Angular.io]: https://img.shields.io/badge/Angular-DD0031?style=for-the-badge&logo=angular&logoColor=white
-[Angular-url]: https://angular.io/
-[Svelte.dev]: https://img.shields.io/badge/Svelte-4A4A55?style=for-the-badge&logo=svelte&logoColor=FF3E00
-[Svelte-url]: https://svelte.dev/
-[Laravel.com]: https://img.shields.io/badge/Laravel-FF2D20?style=for-the-badge&logo=laravel&logoColor=white
-[Laravel-url]: https://laravel.com
-[Bootstrap.com]: https://img.shields.io/badge/Bootstrap-563D7C?style=for-the-badge&logo=bootstrap&logoColor=white
-[Bootstrap-url]: https://getbootstrap.com
-[JQuery.com]: https://img.shields.io/badge/jQuery-0769AD?style=for-the-badge&logo=jquery&logoColor=white
-[JQuery-url]: https://jquery.com 
 
 
 [Rust]:https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white
 [Rust-url]: https://rust-lang.org/
 
-
 [VulkanSDK]:https://img.shields.io/badge/vulkan-A41E22?style=for-the-badge&logo=vulkan&logoColor=white
-[Vulkan-url]:https://vulkan.lunarg.com/
+[VulkanSDK-url]:https://vulkan.lunarg.com/
