@@ -153,7 +153,7 @@ impl Context {
 
         // Create pipeline
         let vert_shader = include_bytes!("../../shader/vert.spv");
-        let frag_shader = include_bytes!("../../shader/frag4.spv");
+        let frag_shader = include_bytes!("../../shader/frag.spv");
         data.pipeline = Pipeline::create(
             &device,
             data.swapchain.format,

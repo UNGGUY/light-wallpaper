@@ -30,9 +30,13 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/othneildrew/Best-README-Template">
-    <img src="images/logo.png" alt="Logo" width="80" height="80">
-  </a>
+
+.____    .__       .__     __     __      __                                    
+|    |   |__| ____ |  |___/  |_  /  \    /  \_____  ______ ______   ___________ 
+|    |   |  |/ ___\|  |  \   __\ \   \/\/   /\__  \ \____ \\____ \_/ __ \_  __ \
+|    |___|  / /_/  >   Y  \  |    \        /  / __ \|  |_> >  |_> >  ___/|  | \/
+|_______ \__\___  /|___|  /__|     \__/\  /  (____  /   __/|   __/ \___  >__|   
+        \/ /_____/      \/              \/        \/|__|   |__|        \/       
 
   <h3 align="center">light wallpaper</h3>
 
@@ -201,10 +205,11 @@ let frag_shader = include_bytes!("../../shader/yourfrag.spv");
     - [x] Wayland protocol integration & window management
     - [x] Shader loading and compilation
 - [x] **Basic Functionality**
-    - [x] Image/video wallpaper rendering
+    - [x] Image wallpaper rendering
     - [x] Wallpaper transitions (e.g., fade-in/fade-out)
 - [ ] **Planned Features**
     - [ ] Configuration file support
+    - [ ] video wallpaper rendering
     - [ ] Dynamic wallpaper scripting interface
     - [ ] Multi-monitor support
 - [ ] **Optimizations**

@@ -1,33 +1,41 @@
 #version 450
-
 layout(location = 0) in vec2 fragTexCoord;
-layout(binding = 0) uniform UniformBufferObject {
-    float iTime;
-    vec2 iResolution; // 屏幕分辨率
-} ubo;
 
-layout(binding = 1) uniform sampler2D texSampler;
+// 如果你的 UBO 里还有其他数据（比如分辨率），可以保留；如果没有，UBO 也可以直接删掉
+layout(binding = 0) uniform UniformBufferObject{
+  float iTime;
+  vec2 iResolution;
+}ubo;
+
+layout(binding = 1) uniform sampler2D texSamplers[2];
+
+layout(push_constant) uniform PushConstants {
+    float progress;
+} pc;
+
 layout(location = 0) out vec4 outColor;
 
+
+
 void main() {
-    // 屏幕宽高比
     float screenAspect = ubo.iResolution.x / ubo.iResolution.y;
-    // 图片宽高比
-    vec2 texSize = vec2(textureSize(texSampler, 0));
+    vec2 texSize = vec2(textureSize(texSamplers[0], 0));
     float imageAspect = texSize.x / texSize.y;
 
     vec2 uv = fragTexCoord;
 
     if (imageAspect > screenAspect) {
-        // 图片太宽，裁掉左右
         float scale = screenAspect / imageAspect;
         uv.x = uv.x * scale + (1.0 - scale) * 0.5;
     } else {
-        // 图片太高，裁掉上下
         float scale = imageAspect / screenAspect;
         uv.y = uv.y * scale + (1.0 - scale) * 0.5;
     }
 
-    // 使用硬件 bilinear + 强制第 0 层 mipmap，避免自定义 bicubic 的柔化
-    outColor = textureLod(texSampler, uv, 0.0);
+    vec4 oldColor = texture(texSamplers[0], uv);
+    vec4 newColor = texture(texSamplers[1], uv);
+
+    outColor = mix(oldColor, newColor, pc.progress);
+
+
 }
