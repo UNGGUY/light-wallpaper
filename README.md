@@ -101,8 +101,6 @@ light-wallpaper is a pure native Vulkan dynamic wallpaper engine for Wayland.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-``
 <!-- GETTING STARTED -->
 ## Getting Started
 
@@ -180,6 +178,14 @@ git checkout wManager
 
 cargo run --release
 ```
+
+### Modify the wallpaper transition
+
+To modify the wallpaper transition effect, you can write your own shader.frag file in the shader folder and compile it into an .spv file. Then edit line 156 in context/context.rs:
+```rust
+let frag_shader = include_bytes!("../../shader/yourfrag.spv");
+```
+**e.g., shader3.frag is an example of a fade-in/fade-out wallpaper transition.** 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

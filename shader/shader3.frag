@@ -35,7 +35,7 @@ void main() {
     vec4 oldColor = texture(texSamplers[0], uv);
     vec4 newColor = texture(texSamplers[1], uv);
 
-      outColor = mix(oldColor, newColor, pc.progress);
+    outColor = mix(oldColor, newColor, pc.progress);
 
 
 }
