@@ -6,10 +6,12 @@ use std::time::Instant;
 
 use wayland_client::{Connection, Proxy};
 
+use config::WallpaperConfig;
 use context::Context;
 use wallpaper::Manager;
 use wayland::State;
 
+mod config;
 mod context;
 mod wallpaper;
 mod wayland;
@@ -37,7 +39,11 @@ fn main() {
         output_scale: 1,
     };
 
-    let directory = Path::new("assets/wallpapers/");
+    let config = WallpaperConfig::load().unwrap();
+
+    println!("{:?}", config.path);
+
+    let directory = Path::new(&config.path);
 
     let mut manager = Manager::new(directory, 15).unwrap();
 

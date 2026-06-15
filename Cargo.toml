@@ -7,8 +7,12 @@ edition = "2024"
 anyhow = "1.0.102"
 bitflags = "2.11.0"
 cgmath = "0.18.0"
+config = "0.15.23"
+dirs = "6.0.0"
 image = "0.25.10"
 log = "0.4.29"
+serde = {version="1.0.228",features=["derive"]}
+shellexpand = "3.1.2"
 tempfile = "3.27.0"
 thiserror = "2.0.18"
 vulkanalia = {version="0.35.0", features = ["libloading", "window"]}
