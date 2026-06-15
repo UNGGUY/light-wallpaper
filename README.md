@@ -121,7 +121,11 @@ git clone https://github.com/UNGGUY/light-wallpaper.git
 2. Vulkan SDK
 The most important component you'll need for developing Vulkan applications is the SDK. It includes the headers, standard validation layers, debugging tools and a loader for the Vulkan functions. The loader looks up the functions in the driver at runtime, similarly to GLEW for OpenGL - if you're familiar with that.
 
-Download the Vulkan SDK installer from [VulkanSDK-url], and add it to your system environment variables after installation.
+  - Download: Get the installer from [VulkanSDK-url].
+
+  - Extract: After downloading, extract the archive to your desired installation directory (e.g., ~/Programs/vulkan/).
+
+  - Configure: Add it to your system environment variables. Note: Please modify the version number in the path below to match the folder you just extracted.
 
 If you are using the default Bash or Zsh shell (common on most Linux distributions), append the following commands to your ~/.bashrc ~/.zshrc file:
 ```sh
@@ -160,13 +164,42 @@ set -gx PKG_CONFIG_PATH $VULKAN_SDK/lib/pkgconfig/ $PKG_CONFIG_PATH
 set -gx CMAKE_PREFIX_PATH $VULKAN_SDK $VULKAN_SDK/lib/VulkanLoader $CMAKE_PREFIX_PATH
 ```
 
-3. Add your wallpaper
-**This project does not include any wallpapers.** You will need to add them yourself.By default, wallpaper files are placed in the assets/wallpapers/ folder at the project root.
-To change the default wallpaper directory, edit line 40 in main.rs: 
-```rust
-let directory = Path::new("assets/wallpapers/");
-```
+Then you need to install the required system libraries. Please run the corresponding command based on your Linux distribution:
 
+*   **Ubuntu / Debian:**
+    ```bash
+    sudo apt update
+    sudo apt install vulkan-headers libvulkan-dev libxcb1-dev
+    ```
+*   **Fedora:**
+    ```bash
+    sudo dnf install vulkan-headers vulkan-loader-devel libxcb-devel
+    ```
+*   **Arch Linux / Manjaro:**
+    ```bash
+    sudo pacman -S vulkan-headers vulkan-icd-loader libxcb
+    ```
+
+3. Configuration
+  XDG Configuration Path
+    - $XDG_CONFIG_HOME/lightwallpaper/config.toml
+  Syntax 
+    lightwallpaper uses a custom, but very simplistic key = value syntax. The syntax is documented below using comments in a sample configuration file.
+  ```toml
+  path = "~/Pictures/assets/wallpapers/"
+  ```
+
+4. Add your wallpaper
+**This project does not include any wallpapers.** You will need to add them yourself By default, wallpaper files are placed in the ~/Pictures/assets/wallpapers/ folder at the project root. 
+
+5. Wayland Compositer Setup
+  - Niri
+  ```bash
+  layer-rule {
+    match namespace="^lightwallpaper$"
+    place-within-backdrop true
+  }
+  ```
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
@@ -174,15 +207,7 @@ let directory = Path::new("assets/wallpapers/");
 <!-- USAGE EXAMPLES -->
 ## Usage
 After completing the steps above, run the following command to launch the project:
-
 ```sh
-cargo run --release
-```
-
-Run the following command to check out the branch that includes wallpaper transitions:
-```sh
-git checkout wManager
-
 cargo run --release
 ```
 
@@ -211,7 +236,7 @@ let frag_shader = include_bytes!("../../shader/yourfrag.spv");
     - [x] Image wallpaper rendering
     - [x] Wallpaper transitions (e.g., fade-in/fade-out)
 - [ ] **Planned Features**
-    - [ ] Configuration file support
+    - [x] Configuration file support
     - [ ] video wallpaper rendering
     - [ ] Dynamic wallpaper scripting interface
     - [ ] Multi-monitor support

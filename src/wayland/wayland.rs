@@ -97,7 +97,7 @@ impl State {
             Some(output),
             //Layer::Background,
             Layer::Background,
-            "wallpaper".into(),
+            "lightwallpaper".into(),
             qh,
             (),
         );
