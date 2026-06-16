@@ -5,9 +5,17 @@ use shellexpand;
 use std::path::PathBuf;
 
 #[derive(Debug, Deserialize)]
+pub struct WallpaperConfigRaw {
+    pub path: PathBuf,
+    pub vert_shader: PathBuf,
+    pub frag_shader: PathBuf,
+}
+
+#[derive(Debug)]
 pub struct WallpaperConfig {
     pub path: PathBuf,
-    pub shader: PathBuf,
+    pub vert_shader: PathBuf,
+    pub frag_shader: PathBuf,
 }
 
 impl WallpaperConfig {
@@ -21,16 +29,22 @@ impl WallpaperConfig {
         println!("{:?}", full_path);
 
         let config = Config::builder()
+            .set_default("path", "~/Pictures/assets/wallpapers/")?
+            .set_default("vert_shader", "shader/vert.spv")?
+            .set_default("frag_shader", "shader/frag.spv")?
             .add_source(File::from(full_path.clone()))
             .build()?;
 
-        let mut settings: Self = config.try_deserialize()?;
+        let settings: WallpaperConfigRaw = config.try_deserialize()?;
 
-        settings.path =
-            PathBuf::from(shellexpand::tilde(&settings.path.to_string_lossy()).into_owned());
-        settings.shader =
-            PathBuf::from(shellexpand::tilde(&settings.shader.to_string_lossy()).into_owned());
-
-        Ok(settings)
+        Ok(Self {
+            path: PathBuf::from(shellexpand::tilde(&settings.path.to_string_lossy()).into_owned()),
+            vert_shader: PathBuf::from(
+                shellexpand::tilde(&settings.vert_shader.to_string_lossy()).into_owned(),
+            ),
+            frag_shader: PathBuf::from(
+                shellexpand::tilde(&settings.frag_shader.to_string_lossy()).into_owned(),
+            ),
+        })
     }
 }

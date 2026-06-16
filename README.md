@@ -186,7 +186,10 @@ Then you need to install the required system libraries. Please run the correspon
   Syntax 
     lightwallpaper uses a custom, but very simplistic key = value syntax. The syntax is documented below using comments in a sample configuration file.
   ```toml
+  #pictures path
   path = "~/Pictures/assets/wallpapers/"
+  #shaders path
+  shader = "~/.config/lightwallpaper/shaders/"
   ```
 
 4. Add your wallpaper
@@ -213,10 +216,9 @@ cargo run --release
 
 ### Modify the wallpaper transition
 
-To modify the wallpaper transition effect, you can write your own shader.frag file in the shader folder and compile it into an .spv file. Then edit line 156 in context/context.rs:
-```rust
-let frag_shader = include_bytes!("../../shader/yourfrag.spv");
-```
+To modify the wallpaper transition effect, you can write your own fragment shader (shader.frag) in the shader directory and compile it into a SPIR-V binary (.spv). Finally, copy the compiled file to your designated shader path.
+
+
 **e.g., shader3.frag is an example of a fade-in/fade-out wallpaper transition.** 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -237,6 +239,7 @@ let frag_shader = include_bytes!("../../shader/yourfrag.spv");
     - [x] Wallpaper transitions (e.g., fade-in/fade-out)
 - [ ] **Planned Features**
     - [x] Configuration file support
+    - [ ] Play BackGround Music
     - [ ] video wallpaper rendering
     - [ ] Dynamic wallpaper scripting interface
     - [ ] Multi-monitor support
@@ -297,14 +300,8 @@ Project Link: [https://github.com/your_username/repo_name](https://github.com/yo
 
 Use this space to list resources you find helpful and would like to give credit to. I've included a few of my favorites to kick things off!
 
-* [Choose an Open Source License](https://choosealicense.com)
-* [GitHub Emoji Cheat Sheet](https://www.webpagefx.com/tools/emoji-cheat-sheet)
-* [Malven's Flexbox Cheatsheet](https://flexbox.malven.co/)
-* [Malven's Grid Cheatsheet](https://grid.malven.co/)
-* [Img Shields](https://shields.io)
-* [GitHub Pages](https://pages.github.com)
-* [Font Awesome](https://fontawesome.com)
-* [React Icons](https://react-icons.github.io/react-icons/search)
+
+
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

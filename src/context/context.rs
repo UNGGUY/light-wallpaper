@@ -119,6 +119,8 @@ impl Context {
         width: u32,
         height: u32,
         path: &Path,
+        vert_path: &Path,
+        frag_path: &Path,
     ) -> Result<Self> {
         let loader = unsafe { LibloadingLoader::new(LIBRARY)? };
         let entry = unsafe { Entry::new(loader).map_err(|b| anyhow!(b))? };
@@ -152,16 +154,21 @@ impl Context {
         data.descriptor_manager = DescriptorManager::create(&device, data.swapchain.images.len())?;
 
         // Create pipeline
-        let vert_shader = include_bytes!("../../shader/vert.spv");
-        let frag_shader = include_bytes!("../../shader/frag.spv");
+        // let vert_shader = include_bytes!(vert);
+        // let frag_shader = include_bytes!(frag);
+        let vert_shader = std::fs::read(vert_path)?;
+        let frag_shader = std::fs::read(frag_path)?;
+
+        println!("read shader finished");
+
         data.pipeline = Pipeline::create(
             &device,
             data.swapchain.format,
             data.swapchain.extent,
             data.msaa_samples,
             data.descriptor_manager.layout,
-            vert_shader,
-            frag_shader,
+            &vert_shader,
+            &frag_shader,
         )?;
 
         // Create command manager

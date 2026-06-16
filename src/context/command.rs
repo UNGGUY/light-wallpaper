@@ -21,7 +21,6 @@ pub struct CommandManager {
 impl CommandManager {
     pub fn create(instance: &Instance, device: &Device, data: &mut ContextData) -> Result<Self> {
         let pool = create_command_pool(instance, device, data)?;
-
         Ok(Self {
             pool,
             buffers: Vec::new(),

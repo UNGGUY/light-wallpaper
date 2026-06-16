@@ -42,6 +42,8 @@ fn main() {
     let config = WallpaperConfig::load().unwrap();
 
     println!("{:?}", config.path);
+    println!("{:?}", config.vert_shader);
+    println!("{:?}", config.frag_shader);
 
     let directory = Path::new(&config.path);
 
@@ -68,6 +70,8 @@ fn main() {
                     state.width * (state.output_scale.max(1) as u32),
                     state.height * (state.output_scale.max(1) as u32),
                     first_path,
+                    &config.vert_shader,
+                    &config.frag_shader,
                 )
                 .unwrap(),
             );
