@@ -90,7 +90,6 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-[![Product Name Screen Shot][product-screenshot]](https://example.com)
 
 light-wallpaper is a pure native Vulkan dynamic wallpaper engine for Wayland.
 

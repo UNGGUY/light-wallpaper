@@ -11,8 +11,11 @@ use context::Context;
 use wallpaper::Manager;
 use wayland::State;
 
+use crate::music::music::MusicManager;
+
 mod config;
 mod context;
+mod music;
 mod wallpaper;
 mod wayland;
 
@@ -41,17 +44,22 @@ fn main() {
 
     let config = WallpaperConfig::load().unwrap();
 
-    println!("{:?}", config.path);
+    println!("{:?}", config.image_path);
+    println!("{:?}", config.audio_path);
     println!("{:?}", config.vert_shader);
     println!("{:?}", config.frag_shader);
 
-    let directory = Path::new(&config.path);
+    let image_path = Path::new(&config.image_path);
+    let audio_path = Path::new(&config.audio_path);
 
-    let mut manager = Manager::new(directory, 15).unwrap();
+    let mut manager = Manager::new(image_path, 15).unwrap();
+    let music_manager = MusicManager::new(audio_path, 0.3).unwrap();
 
     let mut switch = false;
     let mut animation_start_time: Option<Instant> = None;
     let mut first = false;
+
+    music_manager.play().unwrap();
 
     while state.running {
         event_queue.blocking_dispatch(&mut state).unwrap();
