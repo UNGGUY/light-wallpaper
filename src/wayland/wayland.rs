@@ -1,4 +1,17 @@
 #![allow(unused)]
+use crate::config::WallpaperConfig;
+use std::path::{Path, PathBuf};
+use std::thread;
+use std::thread::JoinHandle;
+
+use crate::wallpaper::Manager;
+
+use std::ffi::c_void;
+
+use crate::context::Context;
+
+use std::time::Instant;
+
 use wayland_client::{
     Connection, Dispatch, Proxy, QueueHandle, WEnum, delegate_noop,
     protocol::{
@@ -11,8 +24,6 @@ use crate::wayland::wlr_layer_shell::my_protocol::{
     zwlr_layer_shell_v1::{Layer, ZwlrLayerShellV1},
     zwlr_layer_surface_v1::{self, Anchor, ZwlrLayerSurfaceV1},
 };
-
-use crate::context::Context;
 
 pub struct State {
     pub(crate) running: bool,
@@ -76,49 +87,6 @@ delegate_noop!(State: ignore wl_surface::WlSurface);
 delegate_noop!(State: ignore wl_shm::WlShm);
 delegate_noop!(State: ignore wl_shm_pool::WlShmPool);
 delegate_noop!(State: ignore wl_buffer::WlBuffer);
-
-impl State {
-    fn init_layer_background(&mut self, qh: &QueueHandle<State>) {
-        if self.layer_shell.is_none() || self.base_surface.is_none() || self.output.is_none() {
-            return;
-        }
-
-        if self.layer_surface.is_some() {
-            return;
-        }
-
-        let layer_shell = self.layer_shell.as_ref().unwrap(); // ZwlrLayerShellV1
-        let base_surface = self.base_surface.as_ref().unwrap(); // WlSurface
-        let output = self.output.as_ref().unwrap(); // WlOutput
-
-        // 创建 layer_surface，指定为背景层
-        let layer_surface = layer_shell.get_layer_surface(
-            base_surface,
-            Some(output),
-            //Layer::Background,
-            Layer::Background,
-            "lightwallpaper".into(),
-            qh,
-            (),
-        );
-
-        // 铺满屏幕
-        layer_surface.set_anchor(Anchor::Top | Anchor::Bottom | Anchor::Left | Anchor::Right);
-        // 大小设为 0，让 compositor 根据 output 原生分辨率发送 configure
-        //layer_surface.set_size(0, 0);
-
-        // 临时 hack：强制 2x 过采样，测试 fractional scaling 是否是锯齿来源
-        //base_surface.set_buffer_scale(self.output_scale.max(1));
-        //
-        //set_exclusive_zones是非常关键的设置，可以覆盖bar的影响
-        layer_surface.set_exclusive_zone(-1);
-        layer_surface.set_margin(0, 0, 0, 0);
-        // 提交 surface
-        base_surface.commit();
-
-        self.layer_surface = Some(layer_surface);
-    }
-}
 
 impl Dispatch<wl_seat::WlSeat, ()> for State {
     fn event(
@@ -211,5 +179,136 @@ impl Dispatch<wl_output::WlOutput, ()> for State {
                 //surface.commit();
             }
         }
+    }
+}
+
+impl State {
+    pub fn begin(mut state: State, image_path: PathBuf, config: WallpaperConfig) -> JoinHandle<()> {
+        thread::spawn(move || {
+            let conn = Connection::connect_to_env().unwrap();
+
+            let mut event_queue = conn.new_event_queue();
+            let qhandle = event_queue.handle();
+
+            let display = conn.display();
+            display.get_registry(&qhandle, ());
+
+            let mut manager = Manager::new(&image_path, 15).unwrap();
+
+            let mut switch = false;
+            let mut animation_start_time: Option<Instant> = None;
+            let mut first = false;
+
+            while state.running {
+                event_queue.blocking_dispatch(&mut state).unwrap();
+
+                if state.configured && state.context.is_none() {
+                    let display_ptr = conn.backend().display_ptr() as *mut c_void;
+
+                    let surface_ptr =
+                        state.base_surface.as_ref().unwrap().id().as_ptr() as *mut c_void;
+
+                    let first_path = manager.first().unwrap();
+
+                    state.context = Some(
+                        Context::create_for_wayland(
+                            surface_ptr,
+                            display_ptr,
+                            state.width * (state.output_scale.max(1) as u32),
+                            state.height * (state.output_scale.max(1) as u32),
+                            first_path,
+                            &config.vert_shader,
+                            &config.frag_shader,
+                        )
+                        .unwrap(),
+                    );
+                }
+                if state.configured && state.render {
+                    if let Some(context) = state.context.as_mut() {
+                        if !switch {
+                            if let Some(path) = manager.update() {
+                                switch = true;
+                                first = true;
+                                context.reload_texture(path).unwrap();
+                            }
+                        }
+                        if switch {
+                            if animation_start_time.is_none() {
+                                animation_start_time = Some(Instant::now());
+                            }
+
+                            // 2. 计算当前的渐变进度 (progress)
+                            let elapsed = animation_start_time.unwrap().elapsed();
+                            let raw_progress = (elapsed.as_secs_f32() / 1.0).min(1.0); // 假设动画总时长为 1.0 秒
+                            //
+                            let t = raw_progress; // 假设 raw_progress 是 f32
+                            let smooth_progress = if t < 0.5 {
+                                2.0_f32 * t * t
+                            } else {
+                                // 注意：这里的 -2.0 和 2.0 也要加上 _f32 后缀
+                                1.0_f32 - (-2.0_f32 * t + 2.0_f32).powi(2) / 2.0_f32
+                            };
+
+                            context.switch(smooth_progress, first).unwrap();
+
+                            if first {
+                                first = false;
+                            }
+
+                            if smooth_progress >= 1.0 {
+                                switch = false;
+                                animation_start_time = None;
+                            }
+                        }
+                        context.render_wayland().unwrap();
+                    }
+                    if let Some(surface) = state.base_surface.as_ref() {
+                        surface.commit();
+                    }
+                    //state.render = false;
+                }
+            }
+        })
+    }
+
+    fn init_layer_background(&mut self, qh: &QueueHandle<State>) {
+        if self.layer_shell.is_none() || self.base_surface.is_none() || self.output.is_none() {
+            return;
+        }
+
+        if self.layer_surface.is_some() {
+            return;
+        }
+
+        let layer_shell = self.layer_shell.as_ref().unwrap(); // ZwlrLayerShellV1
+        let base_surface = self.base_surface.as_ref().unwrap(); // WlSurface
+        let output = self.output.as_ref().unwrap(); // WlOutput
+
+        // 创建 layer_surface，指定为背景层
+        let layer_surface = layer_shell.get_layer_surface(
+            base_surface,
+            Some(output),
+            //Layer::Background,
+            Layer::Background,
+            "lightwallpaper".into(),
+            qh,
+            (),
+        );
+
+        // 铺满屏幕
+        layer_surface.set_anchor(Anchor::Top | Anchor::Bottom | Anchor::Left | Anchor::Right);
+        // 大小设为 0，让 compositor 根据 output 原生分辨率发送 configure
+        //layer_surface.set_size(0, 0);
+
+        // 临时 hack：强制 2x 过采样，测试 fractional scaling 是否是锯齿来源
+        //base_surface.set_buffer_scale(self.output_scale.max(1));
+        //
+        //set_exclusive_zones是非常关键的设置，可以覆盖bar的影响
+        layer_surface.set_exclusive_zone(-1);
+        layer_surface.set_margin(0, 0, 0, 0);
+        // 提交 surface
+        base_surface.commit();
+
+        self.layer_surface = Some(layer_surface);
     }
 }

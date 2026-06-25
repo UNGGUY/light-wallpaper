@@ -25,7 +25,6 @@ winit = { version = "0.30.13", features = ["wayland"] }
 
 # audio
 rodio = "0.22.2"
-symphonia = { version = "0.6", default-features = false, features = ["mp3", "wav", "flac", "ogg", "aac", "isomp4"]  }
 
 
 # config
