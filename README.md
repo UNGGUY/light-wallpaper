@@ -167,7 +167,6 @@ Then you need to install the required system libraries. Please run the correspon
 
 *   **Ubuntu / Debian:**
     ```bash
-    sudo apt update
     sudo apt install vulkan-headers libvulkan-dev libxcb1-dev
     ```
 *   **Fedora:**

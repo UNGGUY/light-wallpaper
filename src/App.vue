@@ -4,6 +4,6 @@ import { invoke } from "@tauri-apps/api/core";
 
 </script>
 
-<template><button @click="invoke('hello_world')">hello</button></template>
+<template><button @click="invoke('begin')">hello</button></template>
 
 <style scoped></style>

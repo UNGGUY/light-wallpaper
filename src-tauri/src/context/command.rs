@@ -1,16 +1,15 @@
 #![allow(unused)]
 use std::cmp::min;
 
-use crate::context::ContextData;
 use crate::context::tool::QueueFamilyindices;
 use crate::context::vertex;
-use crate::main;
+use crate::context::ContextData;
 use anyhow::Result;
-use vulkanalia::Device;
-use vulkanalia::Instance;
 use vulkanalia::vk;
 use vulkanalia::vk::DeviceV1_0;
 use vulkanalia::vk::HasBuilder;
+use vulkanalia::Device;
+use vulkanalia::Instance;
 
 #[derive(Default)]
 pub struct CommandManager {
