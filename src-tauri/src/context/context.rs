@@ -9,14 +9,6 @@ use std::time::Instant;
 use cgmath::vec2;
 use vulkanalia::vk::SampleCountFlags;
 
-use crate::context::DescriptorManager;
-use crate::context::DeviceManager;
-use crate::context::DeviceQueue;
-use crate::context::Pipeline;
-use crate::context::Swapchain;
-use crate::context::SyncObjects;
-use crate::context::UniformBufferObject;
-use crate::context::Vertex;
 use crate::context::command::{self, CommandManager};
 use crate::context::frame;
 use crate::context::instance;
@@ -26,17 +18,22 @@ use crate::context::texture;
 use crate::context::tool;
 use crate::context::uniform;
 use crate::context::vertex;
+use crate::context::DescriptorManager;
+use crate::context::DeviceManager;
+use crate::context::DeviceQueue;
+use crate::context::Pipeline;
+use crate::context::Swapchain;
+use crate::context::SyncObjects;
+use crate::context::UniformBufferObject;
+use crate::context::Vertex;
 
 use image::DynamicImage;
 use vertex::VERTICES;
 
-use anyhow::{Result, anyhow};
-use vulkanalia::Device;
-use vulkanalia::Entry;
-use vulkanalia::Instance;
+use anyhow::{anyhow, Result};
 use vulkanalia::bytecode::Bytecode;
-use vulkanalia::loader::LIBRARY;
 use vulkanalia::loader::LibloadingLoader;
+use vulkanalia::loader::LIBRARY;
 use vulkanalia::vk;
 use vulkanalia::vk::DeviceV1_0;
 use vulkanalia::vk::EntryV1_0;
@@ -46,6 +43,9 @@ use vulkanalia::vk::HasBuilder;
 use vulkanalia::vk::ImageView;
 use vulkanalia::vk::InstanceV1_0;
 use vulkanalia::vk::KhrSwapchainExtensionDeviceCommands;
+use vulkanalia::Device;
+use vulkanalia::Entry;
+use vulkanalia::Instance;
 
 use vulkanalia::vk::KhrWaylandSurfaceExtensionInstanceCommands;
 
