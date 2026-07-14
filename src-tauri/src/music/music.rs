@@ -39,7 +39,7 @@ impl MusicManager {
         thread::spawn(move || {
             // 从 MusicManager 已有的 handle 创建 Player
             let player = Player::connect_new(music_manager.handle.mixer());
-            player.set_volume(music_manager.volume);
+            player.set_volume(music_manager.volume());
 
             // 加载并播放第一首曲目
             if !music_manager.tracks.is_empty() {
@@ -190,6 +190,10 @@ impl MusicManager {
     /// 获取音量
     pub fn volume(&self) -> f32 {
         self.volume
+    }
+
+    pub fn handle(&self) -> &MixerDeviceSink {
+        &self.handle
     }
 
     /// 获取曲目总数
