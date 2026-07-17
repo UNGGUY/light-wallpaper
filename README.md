@@ -235,9 +235,11 @@ To modify the wallpaper transition effect, you can write your own fragment shade
 - [x] **Basic Functionality**
     - [x] Image wallpaper rendering
     - [x] Wallpaper transitions (e.g., fade-in/fade-out)
+- [ ] Tauri-Gui 
+    - [ ]  IndexPage
 - [ ] **Planned Features**
     - [x] Configuration file support
-    - [ ] Play BackGround Music
+    - [x] Play BackGround Music
     - [ ] video wallpaper rendering
     - [ ] Dynamic wallpaper scripting interface
     - [ ] Multi-monitor support

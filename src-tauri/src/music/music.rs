@@ -60,9 +60,11 @@ impl MusicManager {
                     Ok(command) => match command {
                         AudioCommand::Resume => {
                             player.play();
+                            println!("Resume");
                         }
                         AudioCommand::Stop => {
-                            player.stop();
+                            player.pause();
+                            println!("Stop");
                         }
                         AudioCommand::Next => {
                             music_manager.play_next_track(&player);
@@ -78,6 +80,7 @@ impl MusicManager {
                             && !matches!(music_manager.mode, MusicPlayMode::Off)
                         {
                             music_manager.advance_and_play(&player);
+                            println!("finsh play next");
                         }
                     }
                     Err(RecvTimeoutError::Disconnected) => {
