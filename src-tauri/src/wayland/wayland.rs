@@ -268,6 +268,10 @@ impl State {
                     //state.render = false;
                 }
             }
+            // 退出前清理 Vulkan 资源，避免 validation layer 报错
+            if let Some(ref mut context) = state.context {
+                context.destroy();
+            }
         })
     }
 

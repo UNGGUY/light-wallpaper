@@ -65,6 +65,7 @@ pub struct Context {
 
 #[derive(Default)]
 pub struct ContextData {
+    pub(crate) destroyed: bool,
     pub(crate) device_manager: DeviceManager,
     pub(crate) device_queue: DeviceQueue,
     pub(crate) surface: vk::SurfaceKHR,
@@ -484,6 +485,10 @@ impl Context {
     }
 
     pub fn destroy(&mut self) {
+        if self.data.destroyed {
+            return;
+        }
+        self.data.destroyed = true;
         unsafe {
             self.device.device_wait_idle().unwrap();
 
@@ -554,7 +559,17 @@ impl Context {
             self.instance.destroy_instance(None);
         }
     }
+}
 
+impl Drop for Context {
+    fn drop(&mut self) {
+        if !self.data.destroyed {
+            self.destroy();
+        }
+    }
+}
+
+impl Context {
     fn update_uniform_buffer(&mut self, image_index: usize) -> Result<()> {
         let i_time = self.start.elapsed().as_secs_f32();
         let i_resolution = vec2(

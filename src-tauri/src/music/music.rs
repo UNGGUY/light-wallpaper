@@ -18,11 +18,14 @@ pub enum AudioCommand {
     Resume,
     Next,
     Prev,
+    SetMode(MusicPlayMode),
+    SetVolume(f32),
 }
 
 pub struct MusicManager {
     handle: MixerDeviceSink, // 必须保持存活，音频输出设备句柄
     tracks: Vec<PathBuf>,    // 音乐文件列表
+    name_list: Vec<String>,  // 音乐名列表
     current_index: usize,    // 当前曲目索引
     mode: MusicPlayMode,     // 播放模式
     volume: f32,             // 音量 0.0 ~ 1.0
@@ -58,20 +61,12 @@ impl MusicManager {
             loop {
                 match rx.recv_timeout(Duration::from_millis(100)) {
                     Ok(command) => match command {
-                        AudioCommand::Resume => {
-                            player.play();
-                            println!("Resume");
-                        }
-                        AudioCommand::Stop => {
-                            player.pause();
-                            println!("Stop");
-                        }
-                        AudioCommand::Next => {
-                            music_manager.play_next_track(&player);
-                        }
-                        AudioCommand::Prev => {
-                            music_manager.play_prev_track(&player);
-                        }
+                        AudioCommand::Resume => player.play(),
+                        AudioCommand::Stop => player.pause(),
+                        AudioCommand::Next => music_manager.play_next_track(&player),
+                        AudioCommand::Prev => music_manager.play_prev_track(&player),
+                        AudioCommand::SetMode(mode) => music_manager.set_mode(mode),
+                        AudioCommand::SetVolume(v) => music_manager.volume = v,
                     },
                     Err(RecvTimeoutError::Timeout) => {
                         // 超时：检查当前曲目是否播完，自动切下一首
@@ -80,7 +75,6 @@ impl MusicManager {
                             && !matches!(music_manager.mode, MusicPlayMode::Off)
                         {
                             music_manager.advance_and_play(&player);
-                            println!("finsh play next");
                         }
                     }
                     Err(RecvTimeoutError::Disconnected) => {
@@ -149,6 +143,7 @@ impl MusicManager {
     /// 加载当前索引的音频文件并追加到播放队列
     fn load_and_play(&self, player: &Player) {
         let path = &self.tracks[self.current_index];
+
         match File::open(path) {
             Ok(file) => match Decoder::try_from(file) {
                 Ok(source) => {
@@ -170,10 +165,11 @@ impl MusicManager {
         let handle =
             rodio::DeviceSinkBuilder::open_default_sink().map_err(|e| anyhow::anyhow!("{e}"))?;
 
-        let tracks = Self::scan_directory(&directory)?;
+        let (tracks, name_list) = Self::scan_directory(&directory)?;
         Ok(Self {
             handle,
             tracks,
+            name_list,
             current_index: 0,
             mode: MusicPlayMode::Sequential,
             volume,
@@ -199,9 +195,17 @@ impl MusicManager {
         &self.handle
     }
 
+    pub fn name_list(&self) -> Vec<String> {
+        self.name_list.clone()
+    }
+
     /// 获取曲目总数
     pub fn len(&self) -> usize {
         self.tracks.len()
+    }
+
+    pub fn current_index(&self) -> usize {
+        self.current_index
     }
 
     /// 是否为空
@@ -210,8 +214,9 @@ impl MusicManager {
     }
 
     /// 扫描目录收集支持的音频文件
-    fn scan_directory(directory: &Path) -> Result<Vec<PathBuf>> {
+    fn scan_directory(directory: &Path) -> Result<(Vec<PathBuf>, Vec<String>)> {
         let mut tracks = Vec::new();
+        let mut name_list: Vec<String> = Vec::new();
 
         if !directory.exists() {
             anyhow::bail!("Directory does not exist: {:?}", directory);
@@ -228,14 +233,21 @@ impl MusicManager {
             let path = entry.path();
 
             if path.is_file() && Self::is_supported_audio(&path) {
+                let name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap();
+
+                name_list.push(name);
                 tracks.push(path);
             }
         }
 
         // 按文件名排序，确保顺序一致
         tracks.sort();
+        name_list.sort();
 
-        Ok(tracks)
+        Ok((tracks, name_list))
     }
 
     /// 检查文件是否是支持的音频格式
