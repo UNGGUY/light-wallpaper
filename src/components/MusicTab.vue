@@ -1,27 +1,41 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 
+interface MusicStatePayload {
+  current_index: number
+  is_playing: boolean
+  mode: string
+}
 
 const audioPath = ref('~/Music/assets/bgm')
-const mode = ref<'sequential' | 'random' | 'single' | 'off'>('sequential')
-const volume = ref(75)
+const mode = ref<'Sequential' | 'Random' | 'Single' | 'Off'>('Sequential')
+const volume = ref(30)
 const isPlaying = ref(true)
-const currentIndex = ref(1)
+const currentIndex = ref(0)
+const length = ref(0)
+const name_list = ref<string[]>([])
 
-const tracks = ref([
-  '01_peaceful_piano.mp3',
-  '02_ambient_dreams.mp3',
-  '03_lofi_chill.mp3',
-  '04_nature_sounds.mp3',
-  '05_jazz_cafe.mp3',
-])
+invoke<string[]>("name_list").then(res => {
+  name_list.value = res
+  length.value = name_list.value.length
+})
+
+// 监听后端音乐状态变化，同步 UI
+onMounted(() => {
+  listen<MusicStatePayload>('music-state-changed', (event) => {
+    currentIndex.value = event.payload.current_index
+    isPlaying.value = event.payload.is_playing
+    mode.value = event.payload.mode as typeof mode.value
+  })
+})
 
 const modes = [
-  { value: 'sequential' as const, label: '顺序', desc: '按名循环' },
-  { value: 'random' as const, label: '随机', desc: '随机播放' },
-  { value: 'single' as const, label: '单曲', desc: '单曲循环' },
-  { value: 'off' as const, label: '关闭', desc: '停止播放' },
+  { value: 'Sequential' as const, label: '顺序', desc: '按名循环' },
+  { value: 'Random' as const, label: '随机', desc: '随机播放' },
+  { value: 'Single' as const, label: '单曲', desc: '单曲循环' },
+  { value: 'Off' as const, label: '关闭', desc: '停止播放' },
 ]
 
 function nextTrack() {
@@ -37,8 +51,18 @@ function togglePlay() {
   } else {
     invoke("resume_music")
   }
-  isPlaying.value = !isPlaying.value
 }
+
+function setMusicPlayMode(m: typeof mode.value) {
+  invoke("set_music_playmode", { mode: m })
+}
+
+
+function setMusicVolume(v: typeof volume.value) {
+  v = v / 100
+  invoke("set_music_volume", { volume: v })
+}
+
 </script>
 
 <template>
@@ -59,7 +83,7 @@ function togglePlay() {
     <div class="card-label">播放模式</div>
     <div class="mode-cards">
       <button v-for="m in modes" :key="m.value" :class="['mode-card', { active: mode === m.value }]"
-        @click="mode = m.value">
+        @click="setMusicPlayMode(m.value)">
         <span class="mode-label">{{ m.label }}</span>
         <span class="mode-desc">{{ m.desc }}</span>
       </button>
@@ -73,13 +97,13 @@ function togglePlay() {
         <span :class="['cover-icon', { spin: isPlaying }]">🎵</span>
       </div>
       <div class="track-info">
-        <span class="track-name">{{ tracks[currentIndex] }}</span>
-        <span class="track-index">第 {{ currentIndex + 1 }} / {{ tracks.length }} 首</span>
+        <span class="track-name">{{ name_list[currentIndex] }}</span>
+        <span class="track-index">第 {{ currentIndex + 1 }} / {{ name_list.length }} 首</span>
       </div>
     </div>
 
     <div class="controls">
-      <button class="ctrl-btn" title="上一首" @click="nextTrack()">
+      <button class="ctrl-btn" title="上一首" @click="prevTrack()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
           <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
         </svg>
@@ -92,7 +116,7 @@ function togglePlay() {
           <path d="M8 5v14l11-7z" />
         </svg>
       </button>
-      <button class="ctrl-btn" title="下一首" @click="prevTrack()">
+      <button class="ctrl-btn" title="下一首" @click="nextTrack()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
           <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
         </svg>
@@ -103,7 +127,7 @@ function togglePlay() {
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" opacity="0.4">
         <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
       </svg>
-      <input type="range" v-model.number="volume" min="0" max="100" class="slider" />
+      <input type="range" v-model.number="volume" min="0" max="100" class="slider" @input="setMusicVolume(volume)" />
       <span class="vol-num">{{ volume }}</span>
     </div>
   </div>
@@ -112,10 +136,10 @@ function togglePlay() {
   <div class="card">
     <div class="card-label">播放列表</div>
     <div class="track-list">
-      <div v-for="(track, i) in tracks" :key="track" :class="['track-item', { active: i === currentIndex }]">
+      <div v-for="(track, i) in name_list" :key="track" :class="['track-item', { active: i === currentIndex }]">
         <div class="track-num">{{ String(i + 1).padStart(2, '0') }}</div>
         <span class="track-title">{{ track }}</span>
-        <span v-if="i === currentIndex" class="now-badge">播放中</span>
+        <span v-if="i === currentIndex" class="now-badge">{{ isPlaying ? '播放中' : '暂停' }}</span>
       </div>
     </div>
   </div>

@@ -16,46 +16,42 @@ const tabs = [
 </script>
 
 <template>
-  <div class="app">
-    <aside class="sidebar">
-      <div class="brand">
-        <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
-          <rect x="4" y="4" width="10" height="10" rx="2" fill="currentColor" opacity="0.9"/>
-          <rect x="18" y="4" width="10" height="10" rx="2" fill="currentColor" opacity="0.7"/>
-          <rect x="4" y="18" width="10" height="10" rx="2" fill="currentColor" opacity="0.5"/>
-          <rect x="18" y="18" width="10" height="10" rx="2" fill="currentColor" opacity="0.3"/>
-        </svg>
-        <div>
-          <span class="brand-name">Light Wallpaper</span>
-          <span class="brand-version">v0.1.0</span>
-        </div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
+        <rect x="4" y="4" width="10" height="10" rx="2" fill="currentColor" opacity="0.9" />
+        <rect x="18" y="4" width="10" height="10" rx="2" fill="currentColor" opacity="0.7" />
+        <rect x="4" y="18" width="10" height="10" rx="2" fill="currentColor" opacity="0.5" />
+        <rect x="18" y="18" width="10" height="10" rx="2" fill="currentColor" opacity="0.3" />
+      </svg>
+      <div>
+        <span class="brand-name">Light Wallpaper</span>
+        <span class="brand-version">v0.1.0</span>
       </div>
+    </div>
 
-      <nav class="nav">
-        <button
-          v-for="tab in tabs"
-          :key="tab.key"
-          :class="['nav-item', { active: activeTab === tab.key }]"
-          @click="activeTab = tab.key"
-        >
-          <span class="nav-icon">{{ tab.icon }}</span>
-          <span class="nav-label">{{ tab.label }}</span>
-        </button>
-      </nav>
+    <nav class="nav">
+      <button v-for="tab in tabs" :key="tab.key" :class="['nav-item', { active: activeTab === tab.key }]"
+        @click="activeTab = tab.key">
+        <span class="nav-icon">{{ tab.icon }}</span>
+        <span class="nav-label">{{ tab.label }}</span>
+      </button>
+    </nav>
 
-      <div class="sidebar-footer">
-        <div class="status-dot" />
-        <span>引擎运行中</span>
-      </div>
-    </aside>
+    <div class="sidebar-footer">
+      <div class="status-dot" />
+      <span>引擎运行中</span>
+    </div>
+  </aside>
 
-    <main class="main">
-      <WallpaperTab v-show="activeTab === 'wallpaper'" />
-      <MusicTab v-show="activeTab === 'music'" />
-      <ShaderTab v-show="activeTab === 'shader'" />
-      <AboutTab v-show="activeTab === 'about'" />
-    </main>
-  </div>
+  <main class="main">
+    <WallpaperTab v-show="activeTab === 'wallpaper'" />
+    <MusicTab v-show="activeTab === 'music'" />
+    <ShaderTab v-show="activeTab === 'shader'" />
+    <AboutTab v-show="activeTab === 'about'" />
+  </main>
+</div>
 </template>
 
 <style>
@@ -80,7 +76,11 @@ const tabs = [
   --transition: 0.2s ease;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
 body {
   background: var(--bg-deep);
@@ -93,9 +93,18 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-active); border-radius: 2px; }
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-active);
+  border-radius: 2px;
+}
 </style>
 
 <style scoped>
@@ -178,8 +187,15 @@ body {
   color: var(--accent);
 }
 
-.nav-icon { font-size: 16px; width: 20px; text-align: center; }
-.nav-label { font-weight: 500; }
+.nav-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+.nav-label {
+  font-weight: 500;
+}
 
 .sidebar-footer {
   display: flex;

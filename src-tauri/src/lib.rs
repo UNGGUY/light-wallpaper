@@ -1,5 +1,4 @@
 use std::path::Path;
-
 use std::sync::mpsc::{self, channel};
 
 use config::WallpaperConfig;
@@ -54,10 +53,10 @@ fn start_engine(app: &tauri::AppHandle) {
     let name_list = music_manager.name_list();
 
     // 启动音频线程
-    let _audio_handle = MusicManager::begin(rx, music_manager);
+    let _audio_handle = MusicManager::begin(rx, music_manager, app.clone());
 
     // 启动壁纸线程
-    // let _wayland_handle = State::begin(state, image_path.to_path_buf(), config);
+    let _wayland_handle = State::begin(state, image_path.to_path_buf(), config);
 
     // 保存 sender 到 Tauri 状态，供后续命令使用
     app.manage(MusicState { tx });
@@ -104,6 +103,11 @@ fn set_music_playmode(music_state: tauri::State<'_, MusicState>, mode: String) {
     let _ = music_state.tx.send(AudioCommand::SetMode(m));
 }
 
+#[tauri::command]
+fn set_music_volume(music_state: tauri::State<'_, MusicState>, volume: f32) {
+    let _ = music_state.tx.send(AudioCommand::SetVolume(volume));
+}
+
 // ── 应用入口 ──
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -121,6 +125,7 @@ pub fn run() {
             prev_track,
             name_list,
             set_music_playmode,
+            set_music_volume,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

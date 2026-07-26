@@ -1,13 +1,13 @@
 #![allow(unused)]
-use crate::context::ContextData;
 use crate::context::tool;
+use crate::context::ContextData;
 
 use anyhow::Result;
 
-use vulkanalia::Device;
-use vulkanalia::Instance;
 use vulkanalia::vk;
 use vulkanalia::vk::InstanceV1_0;
+use vulkanalia::Device;
+use vulkanalia::Instance;
 
 pub fn create_color_objects(
     instance: &Instance,

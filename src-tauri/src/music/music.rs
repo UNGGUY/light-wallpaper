@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
+use tauri::Emitter;
 
 pub enum MusicPlayMode {
     Sequential, // 顺序播放
@@ -29,6 +30,7 @@ pub struct MusicManager {
     current_index: usize,    // 当前曲目索引
     mode: MusicPlayMode,     // 播放模式
     volume: f32,             // 音量 0.0 ~ 1.0
+    is_playing: bool,        // 是否正在播放
 }
 
 impl MusicManager {
@@ -38,7 +40,11 @@ impl MusicManager {
 
     /// 启动音频播放线程，消费 MusicManager 的所有权。
     /// 返回 JoinHandle，主线程可借此等待音频线程结束。
-    pub fn begin(rx: Receiver<AudioCommand>, mut music_manager: MusicManager) -> JoinHandle<()> {
+    pub fn begin(
+        rx: Receiver<AudioCommand>,
+        mut music_manager: MusicManager,
+        app: tauri::AppHandle,
+    ) -> JoinHandle<()> {
         thread::spawn(move || {
             // 从 MusicManager 已有的 handle 创建 Player
             let player = Player::connect_new(music_manager.handle.mixer());
@@ -58,16 +64,37 @@ impl MusicManager {
                 }
             }
 
+            // 发射初始状态
+            music_manager.emit_state(&app);
+
             loop {
                 match rx.recv_timeout(Duration::from_millis(100)) {
-                    Ok(command) => match command {
-                        AudioCommand::Resume => player.play(),
-                        AudioCommand::Stop => player.pause(),
-                        AudioCommand::Next => music_manager.play_next_track(&player),
-                        AudioCommand::Prev => music_manager.play_prev_track(&player),
-                        AudioCommand::SetMode(mode) => music_manager.set_mode(mode),
-                        AudioCommand::SetVolume(v) => music_manager.volume = v,
-                    },
+                    Ok(command) => {
+                        match command {
+                            AudioCommand::Resume => {
+                                player.play();
+                                music_manager.is_playing = true;
+                            }
+                            AudioCommand::Stop => {
+                                player.pause();
+                                music_manager.is_playing = false;
+                            }
+                            AudioCommand::Next => {
+                                music_manager.play_next_track(&player);
+                                music_manager.is_playing = true;
+                            }
+                            AudioCommand::Prev => {
+                                music_manager.play_prev_track(&player);
+                                music_manager.is_playing = true;
+                            }
+                            AudioCommand::SetMode(mode) => music_manager.set_mode(mode),
+                            AudioCommand::SetVolume(v) => {
+                                music_manager.volume = v;
+                                player.set_volume(v);
+                            }
+                        }
+                        music_manager.emit_state(&app);
+                    }
                     Err(RecvTimeoutError::Timeout) => {
                         // 超时：检查当前曲目是否播完，自动切下一首
                         if player.empty()
@@ -75,6 +102,8 @@ impl MusicManager {
                             && !matches!(music_manager.mode, MusicPlayMode::Off)
                         {
                             music_manager.advance_and_play(&player);
+                            music_manager.is_playing = true;
+                            music_manager.emit_state(&app);
                         }
                     }
                     Err(RecvTimeoutError::Disconnected) => {
@@ -173,12 +202,8 @@ impl MusicManager {
             current_index: 0,
             mode: MusicPlayMode::Sequential,
             volume,
+            is_playing: true,
         })
-    }
-
-    /// 获取当前播放模式
-    pub fn mode(&self) -> &MusicPlayMode {
-        &self.mode
     }
 
     /// 设置播放模式
@@ -191,32 +216,29 @@ impl MusicManager {
         self.volume
     }
 
-    pub fn handle(&self) -> &MixerDeviceSink {
-        &self.handle
-    }
-
     pub fn name_list(&self) -> Vec<String> {
         self.name_list.clone()
     }
 
-    /// 获取曲目总数
-    pub fn len(&self) -> usize {
-        self.tracks.len()
-    }
-
-    pub fn current_index(&self) -> usize {
-        self.current_index
-    }
-
-    /// 是否为空
-    pub fn is_empty(&self) -> bool {
-        self.tracks.is_empty()
+    /// 向 Tauri 前端发射当前播放状态
+    fn emit_state(&self, app: &tauri::AppHandle) {
+        let mode_str = match self.mode {
+            MusicPlayMode::Sequential => "Sequential",
+            MusicPlayMode::Random => "Random",
+            MusicPlayMode::Single => "Single",
+            MusicPlayMode::Off => "Off",
+        };
+        let payload = serde_json::json!({
+            "current_index": self.current_index,
+            "is_playing": self.is_playing,
+            "mode": mode_str,
+        });
+        let _ = app.emit("music-state-changed", payload);
     }
 
     /// 扫描目录收集支持的音频文件
     fn scan_directory(directory: &Path) -> Result<(Vec<PathBuf>, Vec<String>)> {
-        let mut tracks = Vec::new();
-        let mut name_list: Vec<String> = Vec::new();
+        let mut entries: Vec<(String, PathBuf)> = Vec::new();
 
         if !directory.exists() {
             anyhow::bail!("Directory does not exist: {:?}", directory);
@@ -233,19 +255,16 @@ impl MusicManager {
             let path = entry.path();
 
             if path.is_file() && Self::is_supported_audio(&path) {
-                let name = path
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap();
-
-                name_list.push(name);
-                tracks.push(path);
+                if let Some(name) = path.file_name() {
+                    entries.push((name.to_string_lossy().to_string(), path));
+                }
             }
         }
 
         // 按文件名排序，确保顺序一致
-        tracks.sort();
-        name_list.sort();
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let (name_list, tracks) = entries.into_iter().unzip();
 
         Ok((tracks, name_list))
     }

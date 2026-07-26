@@ -1,6 +1,6 @@
 #![allow(unused)]
 use crate::config::WallpaperConfig;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::thread;
 use std::thread::JoinHandle;
 
@@ -13,11 +13,12 @@ use crate::context::Context;
 use std::time::Instant;
 
 use wayland_client::{
-    Connection, Dispatch, Proxy, QueueHandle, WEnum, delegate_noop,
+    delegate_noop,
     protocol::{
         wl_buffer, wl_compositor, wl_keyboard, wl_output, wl_registry, wl_seat, wl_shm,
         wl_shm_pool, wl_surface,
     },
+    Connection, Dispatch, Proxy, QueueHandle, WEnum,
 };
 
 use crate::wayland::wlr_layer_shell::my_protocol::{
@@ -240,7 +241,7 @@ impl State {
                             // 2. 计算当前的渐变进度 (progress)
                             let elapsed = animation_start_time.unwrap().elapsed();
                             let raw_progress = (elapsed.as_secs_f32() / 1.0).min(1.0); // 假设动画总时长为 1.0 秒
-                            //
+                                                                                       //
                             let t = raw_progress; // 假设 raw_progress 是 f32
                             let smooth_progress = if t < 0.5 {
                                 2.0_f32 * t * t
