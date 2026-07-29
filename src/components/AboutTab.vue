@@ -4,49 +4,36 @@
 <template>
   <section class="tab">
     <div class="hero">
-      <svg class="hero-logo" viewBox="0 0 48 48" fill="none">
-        <rect x="4" y="4" width="16" height="16" rx="3" fill="currentColor" opacity="1"/>
-        <rect x="24" y="4" width="16" height="16" rx="3" fill="currentColor" opacity="0.7"/>
-        <rect x="4" y="24" width="16" height="16" rx="3" fill="currentColor" opacity="0.5"/>
-        <rect x="24" y="24" width="16" height="16" rx="3" fill="currentColor" opacity="0.25"/>
+      <svg class="hero-icon" viewBox="0 0 48 48" fill="none">
+        <rect x="4" y="4" width="16" height="16" rx="3.5" fill="currentColor" opacity="1"/>
+        <rect x="24" y="4" width="16" height="16" rx="3.5" fill="currentColor" opacity="0.65"/>
+        <rect x="4" y="24" width="16" height="16" rx="3.5" fill="currentColor" opacity="0.45"/>
+        <rect x="24" y="24" width="16" height="16" rx="3.5" fill="currentColor" opacity="0.22"/>
       </svg>
-      <h2>Light Wallpaper</h2>
-      <span class="ver">v0.1.0</span>
+      <h2 class="hero-title">Light Wallpaper</h2>
+      <span class="hero-ver">v0.1.0</span>
     </div>
 
-    <p class="summary">
+    <p class="tagline">
       超轻量 Wayland 动态壁纸引擎<br />
       原生 Vulkan 渲染 · 着色器过渡 · 背景音乐
     </p>
 
-    <div class="tech-grid">
-      <div class="tech-item">
-        <span class="tech-name">Vulkan</span>
-        <span class="tech-role">渲染后端</span>
-      </div>
-      <div class="tech-item">
-        <span class="tech-name">Wayland</span>
-        <span class="tech-role">显示协议</span>
-      </div>
-      <div class="tech-item">
-        <span class="tech-name">Rust</span>
-        <span class="tech-role">后端语言</span>
-      </div>
-      <div class="tech-item">
-        <span class="tech-name">Tauri v2</span>
-        <span class="tech-role">桌面框架</span>
-      </div>
-      <div class="tech-item">
-        <span class="tech-name">Vue 3</span>
-        <span class="tech-role">前端 UI</span>
-      </div>
-      <div class="tech-item">
-        <span class="tech-name">rodio</span>
-        <span class="tech-role">音频引擎</span>
+    <div class="tech">
+      <div v-for="item in [
+        { name: 'Vulkan', role: '渲染后端' },
+        { name: 'Wayland', role: '显示协议' },
+        { name: 'Rust', role: '后端语言' },
+        { name: 'Tauri v2', role: '桌面框架' },
+        { name: 'Vue 3', role: '前端 UI' },
+        { name: 'rodio', role: '音频引擎' },
+      ]" :key="item.name" class="tech-cell">
+        <span class="tech-name">{{ item.name }}</span>
+        <span class="tech-role">{{ item.role }}</span>
       </div>
     </div>
 
-    <p class="license">Unlicense — 自由使用、修改、分发</p>
+    <p class="footnote">Unlicense — 自由使用、修改、分发</p>
   </section>
 </template>
 
@@ -56,9 +43,9 @@
   flex-direction: column;
   align-items: center;
   gap: 20px;
-  padding: 36px 0;
-  max-width: 520px;
-  margin: 0 auto;
+  padding: 28px 0;
+  width: 100%;
+  text-align: center;
 }
 
 .hero {
@@ -68,68 +55,66 @@
   gap: 8px;
 }
 
-.hero-logo {
+.hero-icon {
   width: 56px;
   height: 56px;
   color: var(--accent);
   margin-bottom: 4px;
 }
 
-.hero h2 {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.3px;
+.hero-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.4px;
 }
 
-.ver {
+.hero-ver {
   font-size: 11px;
   padding: 2px 10px;
   border-radius: 10px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  color: var(--text-muted);
+  color: var(--text-faint);
 }
 
-.summary {
-  font-size: 12px;
-  color: var(--text-secondary);
-  text-align: center;
+.tagline {
+  font-size: 12.5px;
+  color: var(--text-dim);
   line-height: 1.8;
 }
 
-/* ── Tech Grid ── */
-.tech-grid {
+.tech {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   width: 100%;
 }
 
-.tech-item {
+.tech-cell {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 14px 8px;
+  gap: 3px;
+  padding: 15px 8px;
   border-radius: var(--radius);
   background: var(--bg-card);
   border: 1px solid var(--border);
 }
 
 .tech-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
 }
 
 .tech-role {
-  font-size: 10px;
-  color: var(--text-muted);
+  font-size: 10.5px;
+  color: var(--text-faint);
 }
 
-.license {
+.footnote {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-faint);
 }
 </style>

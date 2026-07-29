@@ -1,224 +1,190 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import WallpaperTab from './components/WallpaperTab.vue'
-import MusicTab from './components/MusicTab.vue'
+import { ref, computed } from 'vue'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import DashboardTab from './components/DashboardTab.vue'
 import ShaderTab from './components/ShaderTab.vue'
 import AboutTab from './components/AboutTab.vue'
 
-const activeTab = ref('wallpaper')
+const activeTab = ref('dashboard')
 
 const tabs = [
-  { key: 'wallpaper', label: '壁纸', icon: '🖼' },
-  { key: 'music', label: '音乐', icon: '🎵' },
-  { key: 'shader', label: '着色器', icon: '✨' },
-  { key: 'about', label: '关于', icon: 'ℹ' },
+  { key: 'dashboard', label: '仪表盘' },
+  { key: 'shader', label: '着色器' },
+  { key: 'about', label: '关于' },
 ] as const
+
+const tabMap: Record<string, any> = {
+  dashboard: DashboardTab,
+  shader: ShaderTab,
+  about: AboutTab,
+}
+
+const tabComponent = computed(() => tabMap[activeTab.value])
+
+const appWindow = getCurrentWindow()
 </script>
 
 <template>
-<div class="app">
-  <aside class="sidebar">
-    <div class="brand">
-      <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
-        <rect x="4" y="4" width="10" height="10" rx="2" fill="currentColor" opacity="0.9" />
-        <rect x="18" y="4" width="10" height="10" rx="2" fill="currentColor" opacity="0.7" />
-        <rect x="4" y="18" width="10" height="10" rx="2" fill="currentColor" opacity="0.5" />
-        <rect x="18" y="18" width="10" height="10" rx="2" fill="currentColor" opacity="0.3" />
-      </svg>
-      <div>
-        <span class="brand-name">Light Wallpaper</span>
-        <span class="brand-version">v0.1.0</span>
+  <div class="shell">
+    <!-- 自定义标题栏 -->
+    <header class="titlebar" data-tauri-drag-region>
+      <div class="titlebar-brand">
+        <svg class="brand-icon" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="3" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.95" />
+          <rect x="13" y="3" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.7" />
+          <rect x="3" y="13" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.5" />
+          <rect x="13" y="13" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.3" />
+        </svg>
+        <span class="brand-text">Light Wallpaper</span>
       </div>
-    </div>
 
-    <nav class="nav">
-      <button v-for="tab in tabs" :key="tab.key" :class="['nav-item', { active: activeTab === tab.key }]"
-        @click="activeTab = tab.key">
-        <span class="nav-icon">{{ tab.icon }}</span>
-        <span class="nav-label">{{ tab.label }}</span>
-      </button>
-    </nav>
+      <nav class="titlebar-nav">
+        <button
+          v-for="t in tabs"
+          :key="t.key"
+          :class="['nav-link', { active: activeTab === t.key }]"
+          @click="activeTab = t.key"
+        >{{ t.label }}</button>
+      </nav>
 
-    <div class="sidebar-footer">
-      <div class="status-dot" />
-      <span>引擎运行中</span>
-    </div>
-  </aside>
+      <div class="titlebar-status">
+        <span class="status-live"></span>
+        运行中
+      </div>
 
-  <main class="main">
-    <WallpaperTab v-show="activeTab === 'wallpaper'" />
-    <MusicTab v-show="activeTab === 'music'" />
-    <ShaderTab v-show="activeTab === 'shader'" />
-    <AboutTab v-show="activeTab === 'about'" />
-  </main>
-</div>
+      <!-- 窗口控制按钮 -->
+      <div class="win-ctrls">
+        <button class="win-btn" @click="appWindow.minimize()" title="最小化">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button class="win-btn" @click="appWindow.toggleMaximize()" title="最大化">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+        </button>
+        <button class="win-btn win-close" @click="appWindow.close()" title="关闭">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="body">
+      <KeepAlive>
+        <component :is="tabComponent" />
+      </KeepAlive>
+    </main>
+  </div>
 </template>
 
-<style>
-:root {
-  --bg-deep: #0d1117;
-  --bg-sidebar: #0f1419;
-  --bg-card: #161b22;
-  --bg-hover: #1c2333;
-  --bg-input: #0d1117;
-  --border: #21262d;
-  --border-active: #30363d;
-  --text-primary: #e6edf3;
-  --text-secondary: #8b949e;
-  --text-muted: #484f58;
-  --accent: #58a6ff;
-  --accent-dim: #1f6feb;
-  --accent-glow: rgba(88, 166, 255, 0.15);
-  --green: #3fb950;
-  --green-dim: #238636;
-  --radius: 8px;
-  --radius-sm: 4px;
-  --transition: 0.2s ease;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  background: var(--bg-deep);
-  color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  font-size: 13px;
-  line-height: 1.6;
-  overflow: hidden;
-  user-select: none;
-  -webkit-font-smoothing: antialiased;
-}
-
-::-webkit-scrollbar {
-  width: 4px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-active);
-  border-radius: 2px;
-}
-</style>
-
 <style scoped>
-.app {
+.shell {
   display: flex;
+  flex-direction: column;
   height: 100vh;
-  width: 760px;
-  margin: 0 auto;
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
 }
 
-/* ── Sidebar ── */
-.sidebar {
-  width: 170px;
-  flex-shrink: 0;
-  background: var(--bg-sidebar);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  padding: 20px 12px;
-}
-
-.brand {
+/* ── titlebar ── */
+.titlebar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 8px 20px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 16px;
-}
-
-.logo-icon {
-  width: 28px;
-  height: 28px;
-  color: var(--accent);
+  gap: 20px;
+  height: 42px;
+  padding: 0 8px 0 20px;
   flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(16,16,30,0.96) 0%, rgba(12,12,24,0.94) 100%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
-.brand-name {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  line-height: 1.3;
-}
-
-.brand-version {
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
-.nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border: none;
-  border-radius: 6px;
-  background: none;
-  color: var(--text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all var(--transition);
-  text-align: left;
-}
-
-.nav-item:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.nav-item.active {
-  background: var(--accent-glow);
-  color: var(--accent);
-}
-
-.nav-icon {
-  font-size: 16px;
-  width: 20px;
-  text-align: center;
-}
-
-.nav-label {
-  font-weight: 500;
-}
-
-.sidebar-footer {
+.titlebar-brand {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 10px 0;
-  border-top: 1px solid var(--border);
-  font-size: 11px;
-  color: var(--text-muted);
 }
 
-.status-dot {
-  width: 7px;
-  height: 7px;
+.brand-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+  opacity: 0.85;
+}
+
+.brand-text {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-dim);
+  letter-spacing: -0.1px;
+}
+
+.titlebar-nav {
+  display: flex;
+  gap: 1px;
+  flex: 1;
+}
+
+.nav-link {
+  padding: 5px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: rgba(255,255,255,0.45);
+  font-size: 12px;
+  font-family: var(--font);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.nav-link:hover { color: #fff; background: rgba(255,255,255,0.06); }
+.nav-link.active {
+  color: #fff;
+  background: rgba(255,255,255,0.10);
+}
+
+.titlebar-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: rgba(255,255,255,0.35);
+}
+
+.status-live {
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--green);
-  box-shadow: 0 0 6px var(--green);
+  box-shadow: 0 0 5px var(--green);
 }
 
-/* ── Main ── */
-.main {
+/* ── window controls ── */
+.win-ctrls {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.win-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: rgba(255,255,255,0.35);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.win-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.win-close:hover { background: #e04040; color: #fff; }
+
+/* ── body ── */
+.body {
   flex: 1;
-  padding: 24px;
   overflow-y: auto;
+  padding: 24px 32px;
 }
 </style>
